@@ -1,0 +1,12 @@
+{
+  "SourceSans3-Semibold.otf": {
+    "source": "https://raw.githubusercontent.com/adobe-fonts/source-sans/release/OTF/SourceSans3-Semibold.otf",
+    "sha256": "36f1cd2c344aa3109e64429bce41a41e4b2b923beb2db19b8dbf9bb56f05a4f9",
+    "bytes": 339636
+  },
+  "OFL.txt": {
+    "source": "https://raw.githubusercontent.com/adobe-fonts/source-sans/release/LICENSE.md",
+    "sha256": "56af9b9c6715597e458284a474dc118a50a4150e9d547c70f7b4a33c3e6a9328",
+    "bytes": 4486
+  }
+}

@@ -1,5 +1,6 @@
+import { BrandLogo } from '@/components/BrandLogo';
 import React from 'react';
-import { Lock, Sparkles, Cpu } from 'lucide-react';
+import { Lock, FileText, Cpu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OnboardingContainer } from '../OnboardingContainer';
 import { useOnboarding } from '@/contexts/OnboardingContext';
@@ -13,7 +14,7 @@ export function WelcomeStep() {
       title: 'Your data never leaves your device',
     },
     {
-      icon: Sparkles,
+      icon: FileText,
       title: 'Intelligent summaries & insights',
     },
     {
@@ -30,8 +31,7 @@ export function WelcomeStep() {
       hideProgress={true}
     >
       <div className="flex flex-col items-center space-y-10">
-        {/* Divider */}
-        <div className="w-16 h-px bg-gray-300" />
+        <BrandLogo className="w-[300px] h-auto" />
 
         {/* Features Card */}
         <div className="w-full max-w-md bg-white rounded-lg border border-gray-200 shadow-sm p-6 space-y-4">
@@ -54,11 +54,10 @@ export function WelcomeStep() {
         <div className="w-full max-w-xs space-y-3">
           <Button
             onClick={goNext}
-            className="w-full h-11 bg-gray-900 hover:bg-gray-800 text-white"
+            className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             Get Started
           </Button>
-          <p className="text-xs text-center text-gray-500">Takes less than 3 minutes</p>
         </div>
       </div>
     </OnboardingContainer>

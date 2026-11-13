@@ -1,0 +1,205 @@
+{
+  "assets": [
+    {
+      "png": "app-icon-1024.png",
+      "svg": "app-icon.svg",
+      "width": 1024,
+      "height": 1024,
+      "kind": "transparent",
+      "png_sha256": "50245cc95277568889770d459ff1f3644c6ef5d183816923e1c1a8c555f2ba22",
+      "svg_sha256": "dd488109bc7f8b8fea1a2239b3a13d91c4934fea0adb67347a9a051a0369fa87"
+    },
+    {
+      "png": "app-icon-128.png",
+      "svg": "app-icon-128.svg",
+      "width": 128,
+      "height": 128,
+      "kind": "transparent",
+      "png_sha256": "16c61d7682ea5a124870c32778763b757644a597a9e67ac9bd11f01dbc5ff95b",
+      "svg_sha256": "262575fa1fc2668ba6d913eabffa28c96482b3d42cd74d4ce6000d5265a2e75f"
+    },
+    {
+      "png": "app-icon-32.png",
+      "svg": "app-icon-32.svg",
+      "width": 32,
+      "height": 32,
+      "kind": "transparent",
+      "png_sha256": "d399dd93c44bb1611bcd7d138c4c83df65ee1790782795377112e29b10e76721",
+      "svg_sha256": "0cb03216d5bdadc8c1707c576e9a672b2358c7270b07fe65ff6b23f46ce7a729"
+    },
+    {
+      "png": "app-icon-16.png",
+      "svg": "app-icon-16.svg",
+      "width": 16,
+      "height": 16,
+      "kind": "transparent",
+      "png_sha256": "3291f402d8401338f94c8092b90fb002fc7ce50ba26ef29a0b85912efbb286cf",
+      "svg_sha256": "a61450bc0ac19d4a843dcbdb676158f1eeff53a7a7c48d261a5ff2e2e3474cd6"
+    },
+    {
+      "png": "logo-collapsed.png",
+      "svg": "logo-collapsed.svg",
+      "width": 500,
+      "height": 500,
+      "kind": "transparent",
+      "png_sha256": "a238e30f0455f9042d557ffd29d661a34fb2ed5324e4e54e5cde64fbd6fa088f",
+      "svg_sha256": "29f969495a71ea07e906b5ef0c531ff17563fe83b76f0c0ed1ee94cd2b5238bd"
+    },
+    {
+      "png": "logo.png",
+      "svg": "logo.svg",
+      "width": 845,
+      "height": 295,
+      "kind": "transparent",
+      "png_sha256": "a611d4badac1ba87ce97d1b88f6cd43f55e4c74ae4bfb34b2c7b156332f5c62f",
+      "svg_sha256": "16364d7c2d3c4b8a89726b18147a4cbad52f83c3e4fabddf21cec386b29de97a"
+    },
+    {
+      "png": "logo-collapsed-dark.png",
+      "svg": "logo-collapsed-dark.svg",
+      "width": 500,
+      "height": 500,
+      "kind": "transparent",
+      "png_sha256": "f19c39df836d0fb584e08a23b4d0506b564833ed051a1a4b8506b508e971c409",
+      "svg_sha256": "0020d36d0035abfdcc23da29ec586d7bde6de8e0ad20f9821f9b76b1588ec147"
+    },
+    {
+      "png": "logo-dark.png",
+      "svg": "logo-dark.svg",
+      "width": 845,
+      "height": 295,
+      "kind": "transparent",
+      "png_sha256": "bfe3ad0bc46920601df69d2f5e35241853fbff85fcdb2e596ac5af181c72e381",
+      "svg_sha256": "3e771cd926169c0632c459158ae8f7424cfba4a6cb213c6b110b331d7027b6e9"
+    },
+    {
+      "png": "tray-template.png",
+      "svg": "tray-template.svg",
+      "width": 22,
+      "height": 22,
+      "kind": "template",
+      "png_sha256": "3f85db6e2b49f747d86fdb4988b2f5c7e8ac8b5f6c9dd10c3ddc4917e21adbfe",
+      "svg_sha256": "cde88c66bef4e86ce3e4d1bf9e3fba8ec274cb842b77ef2fe1c48ea24414c0de"
+    },
+    {
+      "png": "tray-template@2x.png",
+      "svg": "tray-template@2x.svg",
+      "width": 44,
+      "height": 44,
+      "kind": "template",
+      "png_sha256": "9901cd78f3a32733ecb7f9f607a2986f624dd0e0b1b42eb1bbc4a645350c88bd",
+      "svg_sha256": "02ffce811b61d51467aaf09e923775ee8c08755e2d091bba0c0cdf4490ff0a22"
+    },
+    {
+      "png": "tray-recording-template.png",
+      "svg": "tray-recording-template.svg",
+      "width": 22,
+      "height": 22,
+      "kind": "template",
+      "png_sha256": "684755e65c2a54240e3251f5ffcb972fd0b5e1a1b08e62333eff0925c429280e",
+      "svg_sha256": "8e3529b85cfda921143a58367d9f8b074ddb7c26182fa853522826fc75b71ae1"
+    },
+    {
+      "png": "tray-recording-template@2x.png",
+      "svg": "tray-recording-template@2x.svg",
+      "width": 44,
+      "height": 44,
+      "kind": "template",
+      "png_sha256": "c886c778f4d2c1457876f599154c1e6faa7493f65d9153b945821106a1a9036b",
+      "svg_sha256": "22b90a50e0f555145c13f29c5cba13b81f1468ebda91544778ddc1bd07561322"
+    },
+    {
+      "png": "dmg-background.png",
+      "svg": "dmg-background.svg",
+      "width": 660,
+      "height": 400,
+      "kind": "background",
+      "png_sha256": "a1feb050a2a2fe09be890eb7269b9960447701ec9ee21146c7dbb0d85a513c84",
+      "svg_sha256": "af405ed35ceb7ec126a79de5f489324eac88f3ca16bc2e4c81c22642de508208"
+    },
+    {
+      "png": "dmg-background@2x.png",
+      "svg": "dmg-background@2x.svg",
+      "width": 1320,
+      "height": 800,
+      "kind": "background",
+      "png_sha256": "5205e274c0ffda13d0a9aaee1fcce4aaa39efa5cd098a71dd70cb4a0c50e346f",
+      "svg_sha256": "596e9ca201fd18d36b75269ef3fe61f556200fbceb570c4c0a152188e5ffef65"
+    },
+    {
+      "png": "color-checks.png",
+      "svg": "color-checks.svg",
+      "width": 1000,
+      "height": 510,
+      "kind": "background",
+      "png_sha256": "836b33e72d874dfe8fe07cce3793f2ce917333e75f8430d582cad731965f7992",
+      "svg_sha256": "b3658df5d00daaf4cc4792b3252754391b64d8c6a5e66cefc76eafba3e97a484"
+    },
+    {
+      "png": "preview.png",
+      "svg": "preview.svg",
+      "width": 1400,
+      "height": 1280,
+      "kind": "background",
+      "png_sha256": "08567ca4dbcdf7ef36a733b284901d5f0cb7fbe3222be7b7353ba122185be404",
+      "svg_sha256": "66def0f52fa8f649581d706fb9cf690a3505f9c0c2bafc6ff7c15661981f7898"
+    }
+  ],
+  "validation": {
+    "assets": 16,
+    "all_pngs": "RGBA, embedded sRGB profile",
+    "all_svg_type": "outlined paths; no text elements",
+    "master_alpha_bounds": [
+      100,
+      100,
+      924,
+      924
+    ],
+    "small_icons": "16 px and 32 px use separate pixel-tuned sources",
+    "light_sidebar": "500 px, rendered for review at 40 px",
+    "tray": "black RGB only; antialiasing stored in alpha",
+    "installer_clear_zones": [
+      [
+        105,
+        125,
+        255,
+        300
+      ],
+      [
+        405,
+        125,
+        555,
+        300
+      ]
+    ],
+    "contrast": {
+      "light": {
+        "foreground": 15.933,
+        "speaker-me": 9.89,
+        "speaker-them": 5.338,
+        "muted-foreground": 6.889,
+        "primary-button": 7.3,
+        "muted-text": 6.015,
+        "speaker-grayscale-separation": 1.853
+      },
+      "dark": {
+        "foreground": 15.366,
+        "speaker-me": 6.239,
+        "speaker-them": 12.503,
+        "muted-foreground": 7.995,
+        "primary-button": 7.318,
+        "muted-text": 6.439,
+        "speaker-grayscale-separation": 2.004
+      }
+    },
+    "color_simulations": "color-checks.json",
+    "font": {
+      "family": "Source Sans 3 Semibold",
+      "style": "Regular",
+      "version": "Version 3.052;hotconv 1.1.0;makeotfexe 2.6.0",
+      "license": "SIL Open Font License 1.1",
+      "license_url": "https://github.com/adobe-fonts/source-sans/blob/release/LICENSE.md",
+      "sha256": "36f1cd2c344aa3109e64429bce41a41e4b2b923beb2db19b8dbf9bb56f05a4f9"
+    }
+  }
+}

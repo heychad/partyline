@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 1024 1024" role="img" aria-label="PartyLine Script concept">
+<rect x="100" y="100" width="824" height="824" rx="185" fill="#DFD5BD"/>
+<rect x="130" y="130" width="764" height="764" rx="162" fill="#F4EAD5"/>
+<path d="M325 337 H298 C242 337 226 377 226 420 V537 C226 579 257 611 300 611 H325" fill="none" stroke="#353E3C" stroke-width="40" stroke-linecap="round"/>
+<circle cx="331" cy="337" r="43" fill="#235463"/>
+<rect x="426" y="296" width="328" height="82" rx="26" fill="#235463"/>
+<rect x="426" y="412" width="224" height="44" rx="22" fill="#235463"/>
+<circle cx="331" cy="611" r="43" fill="#9D641D"/>
+<rect x="426" y="570" width="328" height="82" rx="26" fill="#9D641D"/>
+<rect x="426" y="686" width="224" height="44" rx="22" fill="#9D641D"/>
+</svg>

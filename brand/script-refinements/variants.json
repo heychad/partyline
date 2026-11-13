@@ -1,0 +1,17 @@
+[
+  {
+    "id": "receiver",
+    "name": "Receiver",
+    "idea": "A classic receiver replaces the dots and curved line."
+  },
+  {
+    "id": "angled-receiver",
+    "name": "Angled receiver",
+    "idea": "The same receiver, tilted toward the dialogue."
+  },
+  {
+    "id": "headset",
+    "name": "Headset",
+    "idea": "An operator\u2019s headset sits beside the dialogue."
+  }
+]

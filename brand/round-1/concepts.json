@@ -1,0 +1,116 @@
+{
+  "stage": "Round 1\u2014concepts for selection, not an installed brand",
+  "concepts": [
+    {
+      "id": "switchboard",
+      "name": "Switchboard",
+      "idea": "Two colored patch cords share one jack on a pocket-sized telephone exchange.",
+      "light": {
+        "brand": "#235553",
+        "me": "#214E70",
+        "them": "#976810"
+      },
+      "dark": {
+        "brand": "#90C2BA",
+        "me": "#8ABAD4",
+        "them": "#F5CE7B"
+      },
+      "contrast": {
+        "light": {
+          "brand": 8.414,
+          "me": 8.793,
+          "them": 4.88
+        },
+        "dark": {
+          "brand": 8.71,
+          "me": 8.253,
+          "them": 11.488
+        }
+      },
+      "grayscale_luminance": {
+        "light": {
+          "me": 0.069,
+          "them": 0.165
+        },
+        "dark": {
+          "me": 0.453,
+          "them": 0.65
+        }
+      }
+    },
+    {
+      "id": "handset",
+      "name": "Handset",
+      "idea": "A two-tone receiver gives ME and THEM opposite ends of the same call.",
+      "light": {
+        "brand": "#A2452D",
+        "me": "#183D54",
+        "them": "#A95C32"
+      },
+      "dark": {
+        "brand": "#EDA383",
+        "me": "#8AAEC6",
+        "them": "#F7D1A4"
+      },
+      "contrast": {
+        "light": {
+          "brand": 6.131,
+          "me": 11.448,
+          "them": 4.925
+        },
+        "dark": {
+          "brand": 8.345,
+          "me": 7.346,
+          "them": 11.992
+        }
+      },
+      "grayscale_luminance": {
+        "light": {
+          "me": 0.042,
+          "them": 0.163
+        },
+        "dark": {
+          "me": 0.398,
+          "them": 0.681
+        }
+      }
+    },
+    {
+      "id": "script",
+      "name": "Script",
+      "idea": "Alternating dialogue lines connect through one looping telephone cord.",
+      "light": {
+        "brand": "#353E3C",
+        "me": "#235463",
+        "them": "#9D641D"
+      },
+      "dark": {
+        "brand": "#D7DECF",
+        "me": "#86B4BA",
+        "them": "#F6CD87"
+      },
+      "contrast": {
+        "light": {
+          "brand": 11.02,
+          "me": 8.334,
+          "them": 4.913
+        },
+        "dark": {
+          "brand": 12.508,
+          "me": 7.593,
+          "them": 11.492
+        }
+      },
+      "grayscale_luminance": {
+        "light": {
+          "me": 0.076,
+          "them": 0.164
+        },
+        "dark": {
+          "me": 0.413,
+          "them": 0.65
+        }
+      }
+    }
+  ]
+}

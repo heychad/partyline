@@ -1,0 +1,78 @@
+{
+  "source": "https://raw.githubusercontent.com/njsmith/colorspacious/master/colorspacious/cvd.py",
+  "model": "Machado et al. 2009, severity 100",
+  "conditions": {
+    "normal": {
+      "light": {
+        "background": "#FFFFFF",
+        "me": "#4F386E",
+        "them": "#8B6418",
+        "me_contrast": 9.89,
+        "them_contrast": 5.338,
+        "speaker_luminance_ratio": 1.853
+      },
+      "dark": {
+        "background": "#1B1721",
+        "me": "#A393B9",
+        "them": "#F3D789",
+        "me_contrast": 6.239,
+        "them_contrast": 12.503,
+        "speaker_luminance_ratio": 2.004
+      }
+    },
+    "grayscale": {
+      "light": {
+        "background": "#FFFFFF",
+        "me": "#434343",
+        "them": "#6B6B6B",
+        "me_contrast": 9.894,
+        "them_contrast": 5.329,
+        "speaker_luminance_ratio": 1.856
+      },
+      "dark": {
+        "background": "#191919",
+        "me": "#9A9A9A",
+        "them": "#D9D9D9",
+        "me_contrast": 6.248,
+        "them_contrast": 12.456,
+        "speaker_luminance_ratio": 1.994
+      }
+    },
+    "protanomaly": {
+      "light": {
+        "background": "#FFFFFF",
+        "me": "#284370",
+        "them": "#736508",
+        "me_contrast": 9.873,
+        "them_contrast": 5.843,
+        "speaker_luminance_ratio": 1.69
+      },
+      "dark": {
+        "background": "#151921",
+        "me": "#8C99BB",
+        "them": "#E7D483",
+        "me_contrast": 6.194,
+        "them_contrast": 11.856,
+        "speaker_luminance_ratio": 1.914
+      }
+    },
+    "deuteranomaly": {
+      "light": {
+        "background": "#FFFFFF",
+        "me": "#2E436D",
+        "them": "#7C6F1B",
+        "me_contrast": 9.814,
+        "them_contrast": 5.064,
+        "speaker_luminance_ratio": 1.938
+      },
+      "dark": {
+        "background": "#161921",
+        "me": "#8F9AB8",
+        "them": "#EEDD8C",
+        "me_contrast": 6.261,
+        "them_contrast": 12.849,
+        "speaker_luminance_ratio": 2.052
+      }
+    }
+  }
+}

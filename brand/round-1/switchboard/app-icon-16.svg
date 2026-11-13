@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 1024 1024" role="img" aria-label="PartyLine Switchboard concept">
+<rect x="100" y="100" width="824" height="824" rx="185" fill="#235553"/>
+<rect x="130" y="130" width="764" height="764" rx="162" fill="#2A605C"/>
+<circle cx="512" cy="340" r="126" fill="#173C3E"/>
+<circle cx="512" cy="326" r="116" fill="#F4EAD5"/>
+<circle cx="512" cy="326" r="60" fill="#173C3E"/>
+<path d="M470 414 V523 C470 594 320 562 320 657 C320 720 368 755 430 755" fill="none" stroke="#173C3E" stroke-width="78" stroke-linecap="round" transform="translate(0 10)"/>
+<path d="M554 414 V523 C554 594 704 562 704 657 C704 720 656 755 594 755" fill="none" stroke="#173C3E" stroke-width="78" stroke-linecap="round" transform="translate(0 10)"/>
+<path d="M470 414 V523 C470 594 320 562 320 657 C320 720 368 755 430 755" fill="none" stroke="#8ABAD4" stroke-width="68" stroke-linecap="round"/>
+<path d="M554 414 V523 C554 594 704 562 704 657 C704 720 656 755 594 755" fill="none" stroke="#F5CE7B" stroke-width="68" stroke-linecap="round"/>
+<rect x="428" y="390" width="80" height="102" rx="24" fill="#8ABAD4"/>
+<rect x="516" y="390" width="80" height="102" rx="24" fill="#F5CE7B"/>
+<path d="M440 470 H496 M528 470 H584" fill="none" stroke="#235553" stroke-width="12" stroke-linecap="round"/>
+</svg>

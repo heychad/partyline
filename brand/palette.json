@@ -1,0 +1,31 @@
+{
+  "light": {
+    "background": "#FFFFFF",
+    "foreground": "#271E32",
+    "primary": "#684889",
+    "primary-foreground": "#FFFFFF",
+    "speaker-me": "#4F386E",
+    "speaker-them": "#8B6418",
+    "muted": "#F2EEF6",
+    "muted-foreground": "#62556F",
+    "border": "#D8D0E1"
+  },
+  "dark": {
+    "background": "#1B1721",
+    "foreground": "#F4EDF7",
+    "primary": "#BEA6D9",
+    "primary-foreground": "#271E32",
+    "speaker-me": "#A393B9",
+    "speaker-them": "#F3D789",
+    "muted": "#30273B",
+    "muted-foreground": "#B8AABD",
+    "border": "#51445E"
+  },
+  "icon": {
+    "edge": "#2B203A",
+    "body": "#392B49",
+    "receiver": "#D7C7C0",
+    "me": "#A393B9",
+    "them": "#F3D789"
+  }
+}

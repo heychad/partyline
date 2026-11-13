@@ -1,0 +1,231 @@
+{
+  "layout": {
+    "receiver_bounds": [
+      216,
+      296,
+      426,
+      730
+    ],
+    "text_x": 490,
+    "minimum_gap_px": 64,
+    "text_bottom": 730
+  },
+  "colorways": [
+    {
+      "number": 1,
+      "name": "Parchment",
+      "folder": "01-parchment",
+      "colors": {
+        "edge": "#DFD5BD",
+        "body": "#F4EAD5",
+        "receiver": "#353E3C",
+        "me": "#235463",
+        "them": "#9D641D"
+      },
+      "hsl": {
+        "edge": "42 35% 81%",
+        "body": "41 58% 90%",
+        "receiver": "167 8% 23%",
+        "me": "194 48% 26%",
+        "them": "33 69% 36%"
+      },
+      "icon_contrast": {
+        "me": 6.975,
+        "them": 4.112
+      },
+      "speaker_luminance_ratio": 1.696
+    },
+    {
+      "number": 2,
+      "name": "Harbor",
+      "folder": "02-harbor",
+      "colors": {
+        "edge": "#102737",
+        "body": "#183246",
+        "receiver": "#C6CFCA",
+        "me": "#719DBB",
+        "them": "#F2D08A"
+      },
+      "hsl": {
+        "edge": "205 55% 14%",
+        "body": "206 49% 18%",
+        "receiver": "147 9% 79%",
+        "me": "204 35% 59%",
+        "them": "40 80% 75%"
+      },
+      "icon_contrast": {
+        "me": 4.574,
+        "them": 8.945
+      },
+      "speaker_luminance_ratio": 1.956
+    },
+    {
+      "number": 3,
+      "name": "Moss",
+      "folder": "03-moss",
+      "colors": {
+        "edge": "#293E35",
+        "body": "#354E42",
+        "receiver": "#C3C3A6",
+        "me": "#9DB799",
+        "them": "#F2E7BD"
+      },
+      "hsl": {
+        "edge": "154 20% 20%",
+        "body": "151 19% 26%",
+        "receiver": "60 19% 71%",
+        "me": "112 17% 66%",
+        "them": "48 67% 85%"
+      },
+      "icon_contrast": {
+        "me": 4.167,
+        "them": 7.303
+      },
+      "speaker_luminance_ratio": 1.752
+    },
+    {
+      "number": 4,
+      "name": "Oxblood",
+      "folder": "04-oxblood",
+      "colors": {
+        "edge": "#5E2430",
+        "body": "#762F3C",
+        "receiver": "#E1B2A7",
+        "me": "#91B3B8",
+        "them": "#F5E1B3"
+      },
+      "hsl": {
+        "edge": "348 45% 25%",
+        "body": "349 43% 32%",
+        "receiver": "11 49% 77%",
+        "me": "188 22% 65%",
+        "them": "42 77% 83%"
+      },
+      "icon_contrast": {
+        "me": 4.167,
+        "them": 7.271
+      },
+      "speaker_luminance_ratio": 1.745
+    },
+    {
+      "number": 5,
+      "name": "Mint",
+      "folder": "05-mint",
+      "colors": {
+        "edge": "#B9D2C3",
+        "body": "#D2E9DC",
+        "receiver": "#3B4540",
+        "me": "#214F50",
+        "them": "#9B603F"
+      },
+      "hsl": {
+        "edge": "144 22% 77%",
+        "body": "146 34% 87%",
+        "receiver": "150 8% 25%",
+        "me": "181 42% 22%",
+        "them": "22 42% 43%"
+      },
+      "icon_contrast": {
+        "me": 7.147,
+        "them": 3.97
+      },
+      "speaker_luminance_ratio": 1.8
+    },
+    {
+      "number": 6,
+      "name": "Plum",
+      "folder": "06-plum",
+      "colors": {
+        "edge": "#2B203A",
+        "body": "#392B49",
+        "receiver": "#D7C7C0",
+        "me": "#A393B9",
+        "them": "#F3D789"
+      },
+      "hsl": {
+        "edge": "265 29% 18%",
+        "body": "268 26% 23%",
+        "receiver": "18 22% 80%",
+        "me": "265 21% 65%",
+        "them": "44 82% 75%"
+      },
+      "icon_contrast": {
+        "me": 4.599,
+        "them": 9.217
+      },
+      "speaker_luminance_ratio": 2.004
+    },
+    {
+      "number": 7,
+      "name": "Cobalt",
+      "folder": "07-cobalt",
+      "colors": {
+        "edge": "#183A86",
+        "body": "#214AA1",
+        "receiver": "#DCE7F7",
+        "me": "#96B1DA",
+        "them": "#FFEBA3"
+      },
+      "hsl": {
+        "edge": "221 70% 31%",
+        "body": "221 66% 38%",
+        "receiver": "216 63% 92%",
+        "me": "216 48% 72%",
+        "them": "47 100% 82%"
+      },
+      "icon_contrast": {
+        "me": 3.751,
+        "them": 6.903
+      },
+      "speaker_luminance_ratio": 1.84
+    },
+    {
+      "number": 8,
+      "name": "Peach",
+      "folder": "08-peach",
+      "colors": {
+        "edge": "#DDBAA5",
+        "body": "#F3D4C0",
+        "receiver": "#4B444D",
+        "me": "#573D69",
+        "them": "#986311"
+      },
+      "hsl": {
+        "edge": "22 45% 76%",
+        "body": "24 68% 85%",
+        "receiver": "287 6% 28%",
+        "me": "275 27% 33%",
+        "them": "36 80% 33%"
+      },
+      "icon_contrast": {
+        "me": 6.584,
+        "them": 3.631
+      },
+      "speaker_luminance_ratio": 1.813
+    },
+    {
+      "number": 9,
+      "name": "Marigold",
+      "folder": "09-marigold",
+      "colors": {
+        "edge": "#D5AC44",
+        "body": "#ECC458",
+        "receiver": "#45443A",
+        "me": "#253D56",
+        "them": "#A05233"
+      },
+      "hsl": {
+        "edge": "43 63% 55%",
+        "body": "44 80% 64%",
+        "receiver": "55 9% 25%",
+        "me": "211 40% 24%",
+        "them": "17 52% 41%"
+      },
+      "icon_contrast": {
+        "me": 6.702,
+        "them": 3.361
+      },
+      "speaker_luminance_ratio": 1.994
+    }
+  ]
+}

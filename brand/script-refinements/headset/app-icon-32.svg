@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 1024 1024" role="img" aria-label="PartyLine Script with headset">
+<rect xmlns="http://www.w3.org/2000/svg" x="100" y="100" width="824" height="824" rx="185" fill="#DFD5BD" />
+
+<rect xmlns="http://www.w3.org/2000/svg" x="130" y="130" width="764" height="764" rx="162" fill="#F4EAD5" />
+
+<path d="M210 474 V392 C210 343 244 310 286 310 C328 310 362 343 362 392 V474" fill="none" stroke="#353E3C" stroke-width="34" stroke-linecap="round"/>
+<path d="M362 530 V584 Q362 628 318 628 H302" fill="none" stroke="#353E3C" stroke-width="30" stroke-linecap="round"/>
+<rect x="184" y="426" width="56" height="122" rx="24" fill="#235463"/>
+<rect x="334" y="426" width="56" height="122" rx="24" fill="#9D641D"/>
+<rect x="276" y="608" width="66" height="40" rx="20" fill="#9D641D"/>
+<rect xmlns="http://www.w3.org/2000/svg" x="426" y="296" width="328" height="82" rx="26" fill="#235463" />
+
+<rect xmlns="http://www.w3.org/2000/svg" x="426" y="412" width="224" height="44" rx="22" fill="#235463" />
+
+<rect xmlns="http://www.w3.org/2000/svg" x="426" y="570" width="328" height="82" rx="26" fill="#9D641D" />
+
+<rect xmlns="http://www.w3.org/2000/svg" x="426" y="686" width="224" height="44" rx="22" fill="#9D641D" />
+
+</svg>

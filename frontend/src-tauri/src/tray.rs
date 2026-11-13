@@ -21,10 +21,17 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     // Pass can_record=true initially, will be updated by update_tray_menu immediately
     let menu = build_menu(app, RecordingState::Stopped, true)?;
 
-    TrayIconBuilder::with_id("main-tray")
+    let builder = TrayIconBuilder::with_id("main-tray")
         .menu(&menu)
-        .tooltip("PartyLine")
-        .icon(app.default_window_icon().unwrap().clone())
+        .tooltip("PartyLine");
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .icon(tauri::include_image!("icons/tray-template@2x.png"))
+        .icon_as_template(true);
+    #[cfg(not(target_os = "macos"))]
+    let builder = builder.icon(app.default_window_icon().unwrap().clone());
+
+    builder
         .on_menu_event(|app, event| handle_menu_event(app, event.id.as_ref()))
         .build(app)?;
 
@@ -300,6 +307,19 @@ pub async fn update_tray_menu_async<R: Runtime>(app: &AppHandle<R>) {
     // Only block recording during incomplete onboarding when no transcription model is ready
     let can_record = check_can_record(app).await;
     log::info!("Tray: can_record: {}", can_record);
+
+    // Derive the dot from the actual capture state, not a requested transition.
+    #[cfg(target_os = "macos")]
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let icon = if matches!(recording_state, RecordingState::Recording) {
+            tauri::include_image!("icons/tray-recording-template@2x.png")
+        } else {
+            tauri::include_image!("icons/tray-template@2x.png")
+        };
+        if let Err(error) = tray.set_icon_with_as_template(Some(icon), true) {
+            log::warn!("Tray: Could not update recording icon: {}", error);
+        }
+    }
 
     if let Ok(menu) = build_menu(app, recording_state, can_record) {
         if let Some(tray) = app.tray_by_id("main-tray") {

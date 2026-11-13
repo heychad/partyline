@@ -121,7 +121,7 @@ export function MeetingDetailsSplitView({
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
-                className="relative z-10 flex items-center gap-2 rounded-none border-0 bg-transparent px-6 py-4 text-gray-600 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 data-[state=active]:shadow-none hover:text-gray-900"
+                className="relative z-10 flex items-center gap-2 rounded-none border-0 bg-transparent px-6 py-4 text-gray-600 data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none hover:text-gray-900"
               >
                 <Icon className="h-4 w-4" />
                 {tab.label}
@@ -159,7 +159,7 @@ export function MeetingDetailsSplitView({
           onPointerDown={onPointerDown}
           onKeyDown={onSeparatorKeyDown}
         >
-          <div className="h-full w-px bg-gray-200 transition-[width,background-color] duration-150 ease-out group-hover:w-1 group-hover:bg-blue-400 group-active:w-1 group-active:bg-blue-500" />
+          <div className="h-full w-px bg-gray-200 transition-[width,background-color] duration-150 ease-out group-hover:w-1 group-hover:bg-primary/70 group-active:w-1 group-active:bg-primary" />
         </div>
         <TabsContent
           value="summary"

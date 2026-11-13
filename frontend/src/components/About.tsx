@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
-import Image from 'next/image';
+import { BrandLogo } from './BrandLogo';
 import AnalyticsConsentSwitch from "./AnalyticsConsentSwitch";
 import { UpdateDialog } from "./UpdateDialog";
 import { updateService, UpdateInfo } from '@/services/updateService';
@@ -52,13 +52,7 @@ export function About() {
             {/* Compact Header */}
             <div className="text-center">
                 <div className="mb-3">
-                    <Image
-                        src="icon_128x128.png"
-                        alt="PartyLine Logo"
-                        width={64}
-                        height={64}
-                        className="mx-auto"
-                    />
+                    <BrandLogo className="mx-auto" />
                 </div>
                 {/* <h1 className="text-xl font-bold text-gray-900">PartyLine</h1> */}
                 <span className="text-sm text-gray-500"> v{currentVersion}</span>
@@ -86,7 +80,7 @@ export function About() {
                         )}
                     </Button>
                     {updateInfo?.available && (
-                        <div className="mt-2 text-xs text-blue-600">
+                        <div className="mt-2 text-xs text-primary">
                             Update available: v{updateInfo.version}
                         </div>
                     )}
@@ -117,8 +111,8 @@ export function About() {
             </div>
 
             {/* Coming Soon - Compact */}
-            <div className="bg-blue-50 rounded p-3">
-                <p className="text-s text-blue-800">
+            <div className="bg-accent rounded p-3">
+                <p className="text-s text-primary">
                     <span className="font-bold">Coming soon:</span> A library of on-device AI agents-automating follow-ups, action tracking, and more.
                 </p>
             </div>
@@ -131,7 +125,7 @@ export function About() {
                 </p>
                 <button
                     onClick={handleContactClick}
-                    className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors duration-200 shadow-sm hover:shadow-md"
+                    className="inline-flex items-center px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium rounded transition-colors duration-200 shadow-sm hover:shadow-md"
                 >
                     Chat with the Zackriya team
                 </button>

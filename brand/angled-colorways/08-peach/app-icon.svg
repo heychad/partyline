@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="PartyLine angled receiver—Peach">
+<rect x="100" y="100" width="824" height="824" rx="185" fill="#DDBAA5" />
+
+<rect x="130" y="130" width="764" height="764" rx="162" fill="#F3D4C0" />
+
+<g transform="matrix(1 0 0 1.2122905028 17 -50.7150837989)"><g transform="rotate(-12 292 474)"><defs>
+<path id="receiver" d="M323 296 H354 Q378 296 378 320 V354 Q378 378 354 378 H330 C317 378 309 389 305 402 C285 455 285 494 305 547 C309 560 317 570 330 570 H354 Q378 570 378 594 V628 Q378 652 354 652 H323 C275 652 242 620 225 577 C194 502 194 446 225 371 C242 328 275 296 323 296 Z" />
+<clipPath id="upper"><rect x="160" y="250" width="280" height="140" /></clipPath>
+<clipPath id="lower"><rect x="160" y="558" width="280" height="150" /></clipPath>
+</defs>
+<use href="#receiver" fill="#4B444D" />
+<use href="#receiver" fill="#573D69" clip-path="url(#upper)" />
+<use href="#receiver" fill="#986311" clip-path="url(#lower)" /></g>
+</g><rect x="490" y="296" width="328" height="82" rx="26" fill="#573D69" />
+
+<rect x="490" y="412" width="224" height="44" rx="22" fill="#573D69" />
+
+<rect x="490" y="570" width="328" height="82" rx="26" fill="#986311" />
+
+<rect x="490" y="686" width="224" height="44" rx="22" fill="#986311" />
+
+</svg>

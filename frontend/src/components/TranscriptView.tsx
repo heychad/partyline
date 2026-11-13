@@ -1,5 +1,7 @@
 'use client';
 
+import { SpeakerText } from './SpeakerText';
+
 import { Transcript } from '@/types';
 import { useEffect, useRef, useState } from 'react';
 import { ConfidenceIndicator } from './ConfidenceIndicator';
@@ -310,10 +312,10 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({ transcripts, isR
                   <div className="bg-gray-100 border border-gray-200 rounded-lg px-3 py-2">
                     <div className="relative">
                       <p className="text-base text-gray-800 leading-relaxed" style={{ visibility: 'hidden' }}>
-                        {sizerText}
+                        <SpeakerText text={sizerText} />
                       </p>
                       <p className="text-base text-gray-800 leading-relaxed absolute top-0 left-0">
-                        {displayText}
+                        <SpeakerText text={displayText} />
                       </p>
                     </div>
                   </div>
@@ -321,10 +323,10 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({ transcripts, isR
                   // Regular transcript - simple text
                   <div className="relative">
                     <p className="text-base text-gray-800 leading-relaxed" style={{ visibility: 'hidden' }}>
-                      {sizerText}
+                      <SpeakerText text={sizerText} />
                     </p>
                     <p className="text-base text-gray-800 leading-relaxed absolute top-0 left-0">
-                      {displayText}
+                      <SpeakerText text={displayText} />
                     </p>
                   </div>
                 )}

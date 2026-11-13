@@ -14,7 +14,9 @@ module.exports = {
   			]
   		},
   		colors: {
-  			background: 'hsl(var(--background))',
+            'speaker-me': 'hsl(var(--speaker-me))',
+            'speaker-them': 'hsl(var(--speaker-them))',
+            background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
