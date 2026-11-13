@@ -21,7 +21,10 @@ fn main() {
     ffmpeg::ensure_ffmpeg_binary();
     onnxruntime::ensure_onnxruntime_runtime();
 
-    tauri_build::build()
+    tauri_build::try_build(tauri_build::Attributes::default().plugin(
+        "agent-control",
+        tauri_build::InlinedPlugin::new().commands(&["permissions", "set_permissions", "ui_result", "ui_state"]),
+    )).expect("Tauri build failed")
 }
 
 /// Detects GPU acceleration capabilities and provides build guidance

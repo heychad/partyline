@@ -1,0 +1,21 @@
+[package]
+name = "partyline-agent-control-check"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Test the actual protocol and socket code without building or launching PartyLine.
+[workspace]
+
+[lib]
+path = "../../frontend/src-tauri/src/agent_control/core.rs"
+
+[dependencies]
+async-trait = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+tempfile = "3"

@@ -50,6 +50,7 @@ pub mod groq;
 pub mod openrouter;
 pub mod parakeet_engine;
 pub mod cloud;
+pub mod agent_control;
 pub mod state;
 pub mod summary;
 pub mod tray;
@@ -464,6 +465,7 @@ pub fn run() {
     }
 
     builder
+        .plugin(agent_control::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())

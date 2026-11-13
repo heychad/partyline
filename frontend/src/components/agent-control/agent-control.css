@@ -1,0 +1,12 @@
+.ag-access { position: relative; margin: 8px 0; font-size: 13px; }
+.ag-access > summary { cursor: pointer; padding: 10px 12px; border-radius: 8px; }
+.ag-access > summary:hover, .ag-access > summary:focus-visible { background: #eee8f0; color: #39253b; }
+.ag-panel { position: absolute; z-index: 60; bottom: calc(100% + 8px); left: 0; width: min(340px, calc(100vw - 48px)); padding: 16px; background: #fffaf7; color: #39253b; border: 1px solid #d8cbd8; border-radius: 12px; box-shadow: 0 8px 28px #24132726; }
+.ag-panel label { display: block; font-weight: 600; margin-bottom: 8px; }
+.ag-panel select { width: 100%; padding: 8px; border: 1px solid #aa95ae; border-radius: 6px; background: #fff; color: inherit; }
+.ag-panel p { margin: 12px 0; line-height: 1.45; }
+.ag-panel .ag-error { color: #9c2732; }
+.ag-activity { max-height: min(260px, 38vh); overflow: auto; border-top: 1px solid #ded3de; margin-top: 12px; }
+.ag-activity > div { padding: 9px 0; border-bottom: 1px solid #e7dfe7; }
+.ag-activity span, .ag-activity small { display: block; }
+.ag-activity small { margin-top: 3px; color: #655568; }

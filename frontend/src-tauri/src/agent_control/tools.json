@@ -1,0 +1,846 @@
+[
+  {
+    "name": "partyline_status",
+    "description": "Read app and recording status or recent agent activity. Show, hide, or quit the app. Quit uses the normal recording drain; provide expected_meeting_id if a meeting is active.",
+    "inputSchema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "get"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "activity"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "show"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "hide"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "quit"
+            },
+            "expected_meeting_id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "partyline/permissions": {
+        "get": "read",
+        "activity": "read",
+        "show": "control",
+        "hide": "control",
+        "quit": "control"
+      },
+      "partyline/labels": {
+        "get": "Read app status",
+        "activity": "Read agent activity",
+        "show": "Show PartyLine",
+        "hide": "Hide PartyLine",
+        "quit": "Quit PartyLine"
+      }
+    }
+  },
+  {
+    "name": "partyline_audio",
+    "description": "List inputs, inspect timestamped live audio levels and connection warnings, or select the next microphone in the setup form. Diagnostics do not start capture. Device changes during recording are unsupported.",
+    "inputSchema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "list"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "diagnostics"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "select"
+            },
+            "microphone": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 512,
+              "description": "Input name from partyline_audio/list; empty means system default."
+            }
+          },
+          "required": [
+            "action",
+            "microphone"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "partyline/permissions": {
+        "list": "read",
+        "diagnostics": "read",
+        "select": "control"
+      },
+      "partyline/labels": {
+        "list": "List microphones",
+        "diagnostics": "Read audio diagnostics",
+        "select": "Select next microphone"
+      }
+    }
+  },
+  {
+    "name": "partyline_meetings",
+    "description": "Read cloud history, meeting state, or paginated transcript turns. Open a saved meeting, prepare the next meeting, control transcript following, or dismiss a banner. Raw text editing, deletion, and live participant-list edits are unsupported.",
+    "inputSchema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "list"
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000,
+              "default": 0
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "get"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "transcript"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000,
+              "default": 0
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 100
+            },
+            "final_only": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "open"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "new"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "prepare"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 200
+            },
+            "participants": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              }
+            },
+            "microphone": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 512,
+              "description": "Input name from partyline_audio/list; empty means system default."
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "follow"
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "action",
+            "enabled"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "dismiss"
+            },
+            "target": {
+              "enum": [
+                "error",
+                "notice"
+              ]
+            }
+          },
+          "required": [
+            "action",
+            "target"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "partyline/permissions": {
+        "list": "read",
+        "get": "read",
+        "transcript": "read",
+        "open": "control",
+        "new": "control",
+        "prepare": "control",
+        "follow": "control",
+        "dismiss": "control"
+      },
+      "partyline/labels": {
+        "list": "Read meeting history",
+        "get": "Read meeting",
+        "transcript": "Read transcript",
+        "open": "Open meeting",
+        "new": "Open new meeting",
+        "prepare": "Prepare meeting",
+        "follow": "Set transcript following",
+        "dismiss": "Dismiss banner"
+      }
+    }
+  },
+  {
+    "name": "partyline_recording",
+    "description": "Start, pause, resume, or stop cloud capture using the same native commands as the app. Start uses supplied fields (empty title, no suggestions, and default microphone if omitted). It sends audio to AssemblyAI and transcript text to OpenAI. Pause keeps provider sessions open. Stop returns before final notes finish; poll status or meetings/get.",
+    "inputSchema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "start"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 200
+            },
+            "participants": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              }
+            },
+            "microphone": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 512,
+              "description": "Input name from partyline_audio/list; empty means system default."
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "pause"
+            },
+            "expected_meeting_id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "expected_meeting_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "resume"
+            },
+            "expected_meeting_id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "expected_meeting_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "stop"
+            },
+            "expected_meeting_id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "expected_meeting_id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "partyline/permissions": {
+        "start": "control",
+        "pause": "control",
+        "resume": "control",
+        "stop": "control"
+      },
+      "partyline/labels": {
+        "start": "Start recording",
+        "pause": "Pause recording",
+        "resume": "Resume recording",
+        "stop": "Stop recording"
+      }
+    }
+  },
+  {
+    "name": "partyline_speakers",
+    "description": "Read participant suggestions and detected speaker IDs, or confirm a name. An empty name clears confirmation. ME and unidentified speakers cannot be renamed. Suggestions never assign identities automatically; confirmation updates transcript labels and invalidates notes.",
+    "inputSchema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "list"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "rename"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "speaker": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "name": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 80
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "speaker",
+            "name"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "partyline/permissions": {
+        "list": "read",
+        "rename": "control"
+      },
+      "partyline/labels": {
+        "list": "Read speakers",
+        "rename": "Confirm speaker name"
+      }
+    }
+  },
+  {
+    "name": "partyline_notes",
+    "description": "Read saved and streaming notes with their revisions, or request a refresh. Refresh uses OpenAI and returns when queued; poll notes/get for completion. Stop requests final notes through the recording lifecycle.",
+    "inputSchema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "get"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "refresh"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "partyline/permissions": {
+        "get": "read",
+        "refresh": "control"
+      },
+      "partyline/labels": {
+        "get": "Read notes",
+        "refresh": "Refresh notes"
+      }
+    }
+  },
+  {
+    "name": "partyline_export",
+    "description": "Export Markdown to the existing meeting folder and return it, copy that export to the Mac clipboard, or reveal the folder in Finder. No caller-supplied paths are accepted.",
+    "inputSchema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "markdown"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "copy"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "reveal"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "partyline/permissions": {
+        "markdown": "control",
+        "copy": "control",
+        "reveal": "control"
+      },
+      "partyline/labels": {
+        "markdown": "Export meeting",
+        "copy": "Copy meeting export",
+        "reveal": "Reveal meeting files"
+      }
+    }
+  },
+  {
+    "name": "partyline_connections",
+    "description": "Read only key-presence flags, save or replace keys in Keychain, test provider access, remove a saved key, or open/close Connections. Key values are write-only and never appear in results or activity. Test performs authentication/model-access checks, not paid transcription or notes.",
+    "inputSchema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "status"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "save"
+            },
+            "assemblyai": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "openai": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "test": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "test"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "remove"
+            },
+            "provider": {
+              "enum": [
+                "assemblyai",
+                "openai"
+              ]
+            }
+          },
+          "required": [
+            "action",
+            "provider"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "open"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "close"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "partyline/permissions": {
+        "status": "read",
+        "save": "control",
+        "test": "control",
+        "remove": "control",
+        "open": "control",
+        "close": "control"
+      },
+      "partyline/labels": {
+        "status": "Read connection status",
+        "save": "Save connection keys",
+        "test": "Test connections",
+        "remove": "Remove connection key",
+        "open": "Open Connections",
+        "close": "Close Connections"
+      }
+    }
+  }
+]

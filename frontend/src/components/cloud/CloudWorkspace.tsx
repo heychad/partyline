@@ -7,6 +7,8 @@ import remarkGfm from 'remark-gfm';
 import { Mic, Monitor, Plus, Settings2, Square, Pause, Play, X, Check, Loader2, Copy, FolderOpen, RefreshCw, ArrowDown } from 'lucide-react';
 import { Meeting, isActive, pending, speakerName, stamp, transcriptRows } from './types';
 import './cloud.css';
+import AgentAccess from '../agent-control/AgentAccess';
+import { useCloudAgentBridge } from '../agent-control/useCloudAgentBridge';
 type KeyStatus = { assemblyai: boolean; openai: boolean };
 type History = { id: string; title: string; created_at: string; status: string };
 const message = (e: unknown) => typeof e === 'string' ? e : 'Something went wrong. Please try again.';
@@ -16,6 +18,12 @@ function Connections({ close, changed }: { close: () => void; changed: (s: KeySt
   const [assemblyai, setAssemblyai] = useState(''); const [openai, setOpenai] = useState('');
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [success, setSuccess] = useState('');
   useEffect(() => { invoke<KeyStatus>('cloud_key_status').then(setStatus).catch(e => setError(message(e))); }, []);
+  useEffect(() => {
+    let disposed = false; let off: UnlistenFn | undefined;
+    void listen<KeyStatus>('partyline-agent-connections', ({ payload }) => setStatus(payload))
+      .then(f => { if (disposed) f(); else off = f; });
+    return () => { disposed = true; off?.(); };
+  }, []);
   async function save(test: boolean) {
     setBusy(true); setError(''); setSuccess('');
     try {
@@ -95,9 +103,27 @@ export default function CloudWorkspace() {
   }
   const active = isActive(meeting); const recording = meeting?.status === 'recording' || meeting?.status === 'paused';
   const speakers = meeting ? Array.from(new Set(rows.map(r => r.speaker))).filter(id => id !== 'me' && !pending(id)) : [];
+  useCloudAgentBridge({
+    view: { selected_id: meeting?.id ?? null, follow, connections_open: connections,
+      draft: { title, participants: participants.split(/[,\n]/).map(s => s.trim()).filter(Boolean), microphone } },
+    busy,
+    open: async id => { await open(id); if (selected.current !== id) throw new Error('Meeting did not open.'); },
+    newMeeting: () => { selected.current = null; setMeeting(null); setTitle(''); setParticipants(''); setError(''); },
+    prepare: draft => {
+      selected.current = null; setMeeting(null); setError('');
+      if (draft.title !== undefined) setTitle(draft.title);
+      if (draft.participants !== undefined) setParticipants(draft.participants.join(', '));
+      if (draft.microphone !== undefined) setMicrophone(draft.microphone);
+    },
+    setFollow, setConnections,
+    dismiss: target => target === 'error' ? setError('') : setNotice(''),
+    copied: () => setNotice('Copied notes and transcript. A Markdown copy is saved in the meeting folder.'),
+    keysChanged: setKeys,
+  });
   return <div className="cl-app">
     <aside className="cl-sidebar"><img className="cl-logo" src="/logo.png" alt="PartyLine" /><button className="cl-button cl-primary cl-new" disabled={active || busy} onClick={() => { selected.current = null; setMeeting(null); setTitle(''); setParticipants(''); setError(''); }}><Plus size={17} /> New meeting</button>
       <div className="cl-history-label">Meetings</div><nav className="cl-history" aria-label="Saved meetings">{history.map(h => <button key={h.id} className={meeting?.id === h.id ? 'selected' : ''} disabled={active && meeting?.id !== h.id} onClick={() => void open(h.id)}><strong>{h.title}</strong><span>{new Date(h.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}{['recording', 'paused', 'connecting', 'finishing'].includes(h.status) ? ' · Live' : ''}</span></button>)}{!history.length && <p className="cl-muted">Your meetings will appear here.</p>}</nav>
+      <AgentAccess />
       <button className="cl-button cl-connections" onClick={() => setConnections(true)}><Settings2 size={17} /> Connections <i className={keys?.assemblyai && keys.openai ? 'ready' : ''} /></button>
     </aside>
     <main className="cl-main">

@@ -1,0 +1,72 @@
+name: Agent parity
+
+on:
+  pull_request:
+    paths:
+      - 'AGENTS.md'
+      - 'docs/partyline-agent-control.md'
+      - 'frontend/**'
+      - 'tools/agent-control/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/agent-parity.yml'
+  push:
+    paths:
+      - 'AGENTS.md'
+      - 'docs/partyline-agent-control.md'
+      - 'frontend/**'
+      - 'tools/agent-control/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/agent-parity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-parity-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target/agent-control-ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check inventory drift and review
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        shell: bash
+        run: |
+          if [[ -n "$BASE_SHA" && ! "$BASE_SHA" =~ ^0+$ ]]; then
+            python3 tools/agent-control/check_inventory.py --base "$BASE_SHA"
+          else
+            python3 tools/agent-control/check_inventory.py
+          fi
+      - name: Install frontend test dependencies
+        run: pnpm --dir frontend install --frozen-lockfile --ignore-scripts
+      - name: Test permission service and private socket
+        run: cargo test --manifest-path tools/agent-control/Cargo.toml --locked -j 1
+      - name: Test MCP bridge and inventory checks
+        run: python3 -m unittest discover -s tools/agent-control/tests -p 'test_*.py' -v
+      - name: Test shared UI callbacks
+        run: node --test tools/agent-control/tests/ui.test.mjs
+      - name: Check frontend types
+        run: pnpm --dir frontend exec tsc --noEmit --incremental false
