@@ -85,10 +85,23 @@ impl CoreAudioCapture {
         // When using a tap, the tap provides all the audio we need
         // Including both the tap AND the device creates duplicate audio (echo issue)
 
-        // Create process tap with mono global tap, excluding no processes
-        // Note: Mono tap is more reliable for system audio capture on macOS
-        info!("🎙️ CoreAudio: Creating process tap (global mono tap)...");
-        let tap_desc = ca::TapDesc::with_mono_global_tap_excluding_processes(&cidre::ns::Array::new());
+        // A global tap also hears audio sent to virtual devices. Exclude routing
+        // apps, otherwise a processed microphone (Audio Hijack -> Loopback)
+        // appears both as ME and as a remote participant even with monitors off.
+        let processes = ca::Process::list()
+            .map_err(|e| anyhow::anyhow!("Could not inspect audio routes: {:?}", e))?;
+        let mut excluded = Vec::new();
+        for process in processes {
+            let bundle = process.bundle_id().map(|s| s.to_string()).unwrap_or_default();
+            let own_process = process.pid().ok().is_some_and(|pid| pid as u32 == std::process::id());
+            if own_process || is_audio_router(&bundle) {
+                info!("CoreAudio: Excluding routed audio from {}", bundle);
+                excluded.push(cidre::ns::Number::with_u32(process.0.0));
+            }
+        }
+        let excluded = cidre::ns::Array::from_slice_retained(&excluded);
+        info!("🎙️ CoreAudio: Creating process tap with audio-router exclusions...");
+        let tap_desc = ca::TapDesc::with_mono_global_tap_excluding_processes(&excluded);
         let tap = tap_desc.create_process_tap()
             .map_err(|e| {
                 error!("❌ CoreAudio: Failed to create process tap: {:?}", e);
@@ -442,5 +455,25 @@ mod tests {
 
         info!("Collected {} samples", sample_count);
         assert!(sample_count >= 48000);
+    }
+}
+
+// Keep the original browser/conference-app output; omit copies made by routers.
+fn is_audio_router(bundle: &str) -> bool {
+    let bundle = bundle.to_ascii_lowercase();
+    bundle.starts_with("com.rogueamoeba.") || bundle == "com.bitgapp.eqmac"
+}
+
+#[cfg(test)]
+mod router_tests {
+    use super::is_audio_router;
+    #[test]
+    fn excludes_virtual_mic_routes_without_excluding_meeting_sources() {
+        for bundle in ["com.rogueamoeba.audiohijack", "com.rogueamoeba.Loopback", "com.rogueamoeba.arkaudiod", "com.bitgapp.eqmac"] {
+            assert!(is_audio_router(bundle), "{bundle}");
+        }
+        for bundle in ["com.google.Chrome", "com.google.Chrome.helper", "us.zoom.xos", "com.microsoft.teams2", "com.apple.WebKit.GPU", ""] {
+            assert!(!is_audio_router(bundle), "{bundle}");
+        }
     }
 }

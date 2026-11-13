@@ -1,6 +1,7 @@
 'use client'
 
 import './globals.css'
+import { usePathname } from 'next/navigation'
 import { Source_Sans_3 } from 'next/font/google'
 import Sidebar from '@/components/Sidebar'
 import { SidebarProvider } from '@/components/Sidebar/SidebarProvider'
@@ -63,7 +64,7 @@ function ConditionalImportDialog({
 
 // export { metadata } from './metadata'
 
-export default function RootLayout({
+function LegacyRootLayout({
   children,
 }: {
   children: React.ReactNode
@@ -280,4 +281,10 @@ export default function RootLayout({
       </body>
     </html>
   )
+}
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  if (pathname !== '/') return <LegacyRootLayout>{children}</LegacyRootLayout>;
+  return <html lang="en"><body className={`${sourceSans3.variable} font-sans antialiased`}>{children}<Toaster /></body></html>;
 }

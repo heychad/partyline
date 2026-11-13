@@ -49,6 +49,7 @@ pub mod anthropic;
 pub mod groq;
 pub mod openrouter;
 pub mod parakeet_engine;
+pub mod cloud;
 pub mod state;
 pub mod summary;
 pub mod tray;
@@ -610,6 +611,9 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            cloud::keys::cloud_key_status, cloud::keys::cloud_save_keys, cloud::keys::cloud_remove_key, cloud::keys::cloud_test_keys,
+            cloud::cloud_current, cloud::cloud_get, cloud::cloud_list, cloud::cloud_start, cloud::cloud_stop, cloud::cloud_pause,
+            cloud::cloud_rename_speaker, cloud::cloud_refresh_notes, cloud::cloud_reveal, cloud::cloud_export,
             start_recording,
             stop_recording,
             is_recording,
@@ -838,6 +842,15 @@ pub fn run() {
                 #[cfg(target_os = "macos")]
                 tauri::RunEvent::Reopen { .. } => {
                     tray::focus_main_window(_app_handle);
+                }
+                tauri::RunEvent::ExitRequested { api, .. } if cloud::active() => {
+                    api.prevent_exit();
+                    cloud::stop_active();
+                    let app = _app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        cloud::finish_before_exit().await;
+                        app.exit(0);
+                    });
                 }
                 tauri::RunEvent::Exit => {
                     log::info!("Application exiting, cleaning up resources...");
