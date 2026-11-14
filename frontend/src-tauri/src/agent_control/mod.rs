@@ -1,9 +1,9 @@
 //! Opt-in agent control. Register `agent_control::init()` on the Tauri builder.
-//! Access remains off until a human enables it in the main window.
+//! Access stays at the human's saved choice; new installations start Off.
 pub mod core;
 mod native;
 
-use core::{Access, Service};
+use core::{access_store::AccessStore, Access, Service};
 use native::Native;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -18,6 +18,7 @@ struct Control {
     native: Arc<Native>,
     error: Arc<Mutex<Option<String>>>,
     shutdown: tokio::sync::watch::Sender<bool>,
+    access_store: Option<AccessStore>,
 }
 
 fn local_window(window: &WebviewWindow) -> Result<(), String> {
@@ -49,7 +50,10 @@ fn set_permissions(
     access: Access,
 ) -> Result<(), String> {
     local_window(&window)?;
-    state.service.set_access(access);
+    state.access_store.as_ref().ok_or("Agent access settings are unavailable.")?
+        .apply(&state.service, access)
+        .map_err(|_| "Could not save agent access. Access was not changed.")?;
+    *state.error.lock().unwrap() = None;
     let _ = state.native.app.emit("partyline-agent-permissions", access);
     Ok(())
 }
@@ -97,7 +101,16 @@ pub fn init() -> TauriPlugin<tauri::Wry> {
         .setup(|app, _| {
             let native = Native::new(app.clone());
             let service = Arc::new(Service::new(native.clone()));
-            let error = Arc::new(Mutex::new(None));
+            let directory = app.path().app_data_dir().ok().and_then(|path| {
+                std::fs::create_dir_all(&path).ok()?;
+                Some(path.join("agent-control"))
+            });
+            let access_store = directory.as_deref().and_then(|path| AccessStore::new(path).ok());
+            let saved_error = match access_store.as_ref() {
+                Some(store) if store.restore(&service).is_ok() => None,
+                _ => Some("Could not read saved agent access. Access is Off. Choose access again to save it.".into()),
+            };
+            let error = Arc::new(Mutex::new(saved_error));
             let (shutdown, receiver) = tokio::sync::watch::channel(false);
             let observer = native.clone();
             app.listen("cloud-levels", move |event| {
@@ -108,11 +121,7 @@ pub fn init() -> TauriPlugin<tauri::Wry> {
                     *observer.levels.lock().unwrap() = Some((value, std::time::Instant::now()));
                 }
             });
-            app.manage(Control { service:service.clone(), native, error:error.clone(), shutdown });
-            let directory = app.path().app_data_dir().ok().and_then(|path| {
-                std::fs::create_dir_all(&path).ok()?;
-                Some(path.join("agent-control"))
-            });
+            app.manage(Control { service:service.clone(), native, error:error.clone(), shutdown, access_store });
             let notifier = app.clone();
             tauri::async_runtime::spawn(async move {
                 #[cfg(unix)]

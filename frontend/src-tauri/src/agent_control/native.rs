@@ -137,7 +137,7 @@ impl Backend for Native {
                     "connections":{"assemblyai":keys.assemblyai,"openai":keys.openai},
                     "capabilities":{"transcript_text_edit":false,"live_input_switch":false,
                         "meeting_delete":false,"live_participant_list_edit":false,"update_check":false},
-                    "permission_scope":"Cloud meetings in this macOS app. Agent access resets to off on launch."}),
+                    "permission_scope":"Cloud meetings in this macOS app. Agent access is saved until changed in PartyLine."}),
                 )
             }
             ("partyline_status", "show") => {

@@ -51,6 +51,78 @@ async fn starts_off_and_agents_cannot_grant_access() {
     assert_eq!(service.activity()[0].outcome, "denied");
 }
 
+#[tokio::test]
+async fn saved_access_survives_restart_and_still_enforces_permissions() {
+    use partyline_agent_control_check::access_store::AccessStore;
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("agent-control");
+    let store = AccessStore::new(&path).unwrap();
+    assert_eq!(store.load().unwrap(), Access::Off);
+    for access in [Access::Control, Access::Read, Access::Off] {
+        let first = Service::new(Arc::new(Fake::default()));
+        store.apply(&first, access).unwrap();
+        assert_eq!(first.access(), access);
+        // Closing a process clears its in-memory grant, not the saved choice.
+        first.set_access(Access::Off);
+        let restarted = Service::new(Arc::new(Fake::default()));
+        AccessStore::new(&path).unwrap().restore(&restarted).unwrap();
+        assert_eq!(restarted.access(), access);
+        assert_eq!(restarted.execute(request("status", json!({"action":"get"}))).await.is_ok(), access != Access::Off);
+        assert_eq!(restarted.execute(request("status", json!({"action":"show"}))).await.is_ok(), access == Access::Control);
+        assert!(restarted.execute(request("status", json!({"action":"set_permissions","access":"control"}))).await.is_err());
+    }
+}
+
+#[test]
+fn malformed_saved_access_fails_closed_and_can_be_repaired() {
+    use partyline_agent_control_check::access_store::AccessStore;
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("agent-control");
+    let store = AccessStore::new(&path).unwrap();
+    let service = Service::new(Arc::new(Fake::default()));
+    store.apply(&service, Access::Control).unwrap();
+    for contents in ["broken", r#"{"version":1,"access":"admin"}"#, r#"{"version":2,"access":"control"}"#, r#"{"version":1,"access":"control","unexpected":true}"#] {
+        std::fs::write(path.join("access.json"), contents).unwrap();
+        service.set_access(Access::Control);
+        assert!(store.restore(&service).is_err());
+        assert_eq!(service.access(), Access::Off);
+    }
+    store.apply(&service, Access::Read).unwrap();
+    assert_eq!(store.load().unwrap(), Access::Read);
+}
+
+#[cfg(unix)]
+#[test]
+fn access_settings_are_private_and_reject_symlinks_without_changing_grants() {
+    use partyline_agent_control_check::access_store::AccessStore;
+    use std::os::unix::fs::{symlink, PermissionsExt};
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("agent-control");
+    let store = AccessStore::new(&path).unwrap();
+    let service = Service::new(Arc::new(Fake::default()));
+    store.apply(&service, Access::Read).unwrap();
+    let file = path.join("access.json");
+    assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o700);
+    assert_eq!(std::fs::metadata(&file).unwrap().permissions().mode() & 0o777, 0o600);
+    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o644)).unwrap();
+    assert!(store.load().is_err());
+    // An explicit choice repairs an accidentally broadened file mode.
+    store.apply(&service, Access::Read).unwrap();
+    assert_eq!(std::fs::metadata(&file).unwrap().permissions().mode() & 0o777, 0o600);
+    std::fs::remove_file(&file).unwrap();
+    let unrelated = root.path().join("unrelated");
+    std::fs::write(&unrelated, "unchanged").unwrap();
+    symlink(&unrelated, &file).unwrap();
+    assert!(store.apply(&service, Access::Control).is_err());
+    assert_eq!(service.access(), Access::Read);
+    assert_eq!(std::fs::read_to_string(&unrelated).unwrap(), "unchanged");
+    assert!(store.restore(&service).is_err());
+    assert_eq!(service.access(), Access::Off);
+    let link = root.path().join("linked-directory");
+    symlink(&path, &link).unwrap();
+    assert!(AccessStore::new(&link).is_err());
+}
+
 fn sample(schema: &Value) -> Value {
     if let Some(value) = schema.get("const") {
         return value.clone();

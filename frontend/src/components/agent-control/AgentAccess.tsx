@@ -38,7 +38,7 @@ export default function AgentAccess() {
       await invoke('plugin:agent-control|set_permissions', { access });
       const value = await invoke<State>('plugin:agent-control|permissions');
       setState(value);
-    } catch { setState(s => ({ ...s, error: 'Could not change agent access. Try again.' })); }
+    } catch { setState(s => ({ ...s, error: 'Could not save agent access. Access was not changed. Try again.' })); }
     finally { setBusy(false); }
   }
   return <details className="ag-access">
@@ -48,7 +48,7 @@ export default function AgentAccess() {
       <select id="agent-access" value={state.access} disabled={busy} onChange={e => void change(e.target.value as Access)}>
         <option value="off">Off</option><option value="read">Read only</option><option value="control">Control</option>
       </select>
-      <p>Applies to agents on this Mac account until PartyLine quits. Control allows recording, exports, and connection changes.</p>
+      <p>Saved until you change it. Applies to agents on this Mac account. Control allows recording, exports, and connection changes.</p>
       {state.error && <p role="alert" className="ag-error">{state.error}</p>}
       <div className="ag-activity" role="log" aria-label="Agent activity" aria-live="polite">
         {state.activity.length ? [...state.activity].reverse().map(item => <div key={item.sequence}>

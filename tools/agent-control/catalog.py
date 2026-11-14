@@ -36,7 +36,7 @@ def tool(name, description, actions):
 
 
 TOOLS = [
-    tool('status', 'Read app and recording status or recent agent activity. Show, hide, or quit the app. Quit uses the normal recording drain; provide expected_meeting_id if a meeting is active.', [
+    tool('status', 'Read app and recording status or recent agent activity. Agent access is a saved human-controlled setting; tools cannot change it. Show, hide, or quit the app. Quit uses the normal recording drain; provide expected_meeting_id if a meeting is active.', [
         action('get', 'read', 'Read app status'),
         action('activity', 'read', 'Read agent activity'),
         action('show', 'control', 'Show PartyLine'),

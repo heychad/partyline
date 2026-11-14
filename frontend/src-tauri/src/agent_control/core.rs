@@ -3,6 +3,8 @@
 #[cfg(unix)]
 #[path = "socket.rs"]
 pub mod socket;
+#[path = "access_store.rs"]
+pub mod access_store;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
