@@ -13,6 +13,9 @@ function fixture() {
     setConnections: value => calls.push(['connections', value]),
     dismiss: value => calls.push(['dismiss', value]),
     copied: () => calls.push(['copied']),
+    playback: async args => calls.push(['playback', args]),
+    closePlayback: () => calls.push(['playback_close']),
+    workspace: args => calls.push(['workspace', args]),
   };
   return { calls, handlers };
 }
@@ -60,4 +63,15 @@ test('busy or unknown actions fail without acknowledging a change', async () => 
   handlers.busy = false;
   await assert.rejects(applyAgentUiRequest(request('arbitrary_native_command'), handlers, async () => null), /Unsupported/);
   assert.deepEqual(calls, []);
+});
+
+
+test('playback uses the shared controller callback and is denied during capture', async () => {
+  const {calls,handlers}=fixture();
+  await assert.rejects(applyAgentUiRequest(request('playback',{id:'live',playing:true}),handlers,async()=>({id:'live'})),/active meeting/);
+  assert.deepEqual(calls,[]);
+  await applyAgentUiRequest(request('playback',{id:'saved',position:12,speed:2,playing:true}),handlers,async()=>null);
+  await applyAgentUiRequest(request('playback_close'),handlers,async()=>null);
+  await applyAgentUiRequest(request('workspace',{panel:'settings',trash:true}),handlers,async()=>null);
+  assert.deepEqual(calls,[['playback',{id:'saved',position:12,speed:2,playing:true}],['playback_close'],['workspace',{panel:'settings',trash:true}]]);
 });

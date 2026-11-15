@@ -18,10 +18,22 @@ pub fn read(_provider: &str) -> Result<String, String> {
 #[tauri::command]
 pub fn cloud_key_status() -> KeyStatus {
     KeyStatus {
-        assemblyai: read("assemblyai").is_ok(),
-        openai: read("openai").is_ok(),
+        assemblyai: present("assemblyai"),
+        openai: present("openai"),
     }
 }
+#[cfg(target_os = "macos")]
+fn present(provider: &str) -> bool {
+    // Presence checks do not request password data. macOS still controls access
+    // when recording, notes, chat, or connection testing actually reads a key.
+    security_framework::item::ItemSearchOptions::new()
+        .class(security_framework::item::ItemClass::generic_password())
+        .service(SERVICE).account(provider)
+        .load_data(false).load_attributes(false).load_refs(false)
+        .search().is_ok()
+}
+#[cfg(not(target_os = "macos"))]
+fn present(_provider: &str) -> bool { false }
 #[tauri::command]
 pub fn cloud_save_keys(
     assemblyai: Option<String>,

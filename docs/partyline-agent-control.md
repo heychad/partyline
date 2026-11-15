@@ -1,8 +1,8 @@
 # PartyLine agent control
 
-Eight MCP tools cover 33 actions in the cloud workspace and its native commands. They call the same recording, speaker, notes, export, and Keychain functions as the app. A small view bridge handles setup fields, history selection, Connections, banners, and transcript following.
+Thirteen MCP tools cover 61 actions in the cloud workspace and its native commands. They call the same recording, speaker, notes, export, and Keychain functions as the app. A small view bridge handles setup fields, history selection, Connections, banners, and transcript following.
 
-The implementation is in `frontend/src-tauri/src/agent_control/`, `frontend/src/components/agent-control/`, and `tools/agent-control/`. The macOS app and DMG rebuilt on November 14, 2026 include persistent access settings. All 33 actions have live acceptance coverage across the normal app and an isolated native key-test profile. New installations start with agent access Off.
+The implementation is in `frontend/src-tauri/src/agent_control/`, `frontend/src/components/agent-control/`, and `tools/agent-control/`. The macOS app and DMG rebuilt on November 14, 2026 include persistent access settings. The previous 33-action catalog has live acceptance coverage across the normal app and an isolated native key-test profile; the expanded library catalog has automated and local live coverage, including a completed AI-answer check on November 15. New installations start with agent access Off.
 
 ## Parity inventory
 
@@ -30,11 +30,22 @@ Inventory source: `CloudWorkspace.tsx`, `cloud/mod.rs`, `cloud/keys.rs`, `lib.rs
 | Save keys; save and test; test separately | `connections/save` with optional `test`; `connections/test` | `cloud_save_keys`, `cloud_test_keys` |
 | Remove a saved key (native command, no current button) | `connections/remove` | `cloud_remove_key` |
 | See agent actions and outcomes | `status/activity` | Bounded activity log in the **Agents** control |
+| Search library and view Trash | `meetings/library`, `meetings/search`; `workspace/get`, `workspace/set` for visible filters | `cloud_library`, `cloud_search`; shared React filters |
+| Edit title, participants, transcript, and notes | `meetings/update`, `meetings/edit_turn`, `notes/edit` | `cloud_edit`; shared version-checked edit and atomic persistence |
+| Trim, redact, restore a redacted passage, undo | `meetings/trim`, `meetings/redact`, `meetings/unredact`, `meetings/undo` | `cloud_edit`; original files and revision history retained |
+| Move to Trash and restore | `meetings/trash`, `meetings/restore` | `cloud_edit`; recoverable deletion, no purge action |
+| Click transcript to play; pause, seek, source, speed, close | `playback/get`, `playback/set`, `playback/close` | Shared playback controller and `cloud_audio`; state includes loading/error/end |
+| Copy/export notes, transcript, both; export edited audio | `export/text`, `export/audio` | `cloud_share`, `cloud_audio`; trims/redactions and notes-review guard |
+| Open/close edit, share, Settings, chat panels | `workspace/get`, `workspace/set` | Shared window callbacks; direct edits use the same native commands |
+| Ask recordings, see streamed answer/history, cancel, retry | `chat/ask`, `chat/list`, `chat/cancel` | `cloud_chat_ask`, `cloud_chat_list`, `cloud_chat_cancel`; retry asks again |
+| Choose Drive folder and automatic backup | `backup/settings`, `backup/configure`, `backup/choose_folder` | `cloud_backup_settings`, `cloud_backup_configure`, `cloud_backup_choose_folder`; picker remains visible |
+| Start/retry backup, see progress/errors | `backup/start`, `backup/status` | `cloud_backup_start`, `cloud_backup_status`; async local copy, Drive uploads separately |
+| Inspect MCP setup and connect clients | `clients/status`, `clients/setup` | `cloud_client_status`, `cloud_client_setup`; preserves other client configuration |
 | Grant/revoke agent access; saved level across restarts | Human-only **Agents** control; `status/get` reports the level | Main-window permission commands and private access settings; agents cannot grant access |
 
 Tool names have the `partyline_` prefix. For example, `notes/get` means `partyline_notes` with `{"action":"get","id":"…"}`. The machine-readable catalog is `frontend/src-tauri/src/agent_control/tools.json`; `catalog.py` generates it.
 
-Unsupported actions are explicit in `status/get`: manual transcript-text edits, meeting deletion, changes to the live microphone or participant list, and update checks. The cloud UI does not implement the first four. The tray dispatches an update event, but the cloud root does not mount its listener. Legacy local-model screens and commands are outside this cloud API.
+Unsupported actions are explicit in `status/get`: changes to the live microphone or participant list and update checks. The cloud UI does not implement live input/list changes. Permanent deletion is intentionally absent; Trash is recoverable. The tray dispatches an update event, but the cloud root does not mount its listener. Legacy local-model screens and commands are outside this cloud API.
 
 Participant suggestions never identify a speaker automatically. Rename a detected speaker only after confirmation; an empty name removes confirmation. Existing provider revisions and reconnect speaker IDs remain authoritative.
 
@@ -68,7 +79,7 @@ Diagnostics return the latest existing level event, its observation time, its ag
 
 Transcript pages contain raw turns and word-level speaker IDs plus confirmed names and the meeting revision. Re-read affected pages when the revision changes; page offsets are not stable cursors during live transcription or provider corrections. `meetings/get` returns the full snapshot for smaller meetings.
 
-The bridge never retries a failed mutation automatically. A lost response can mean the action ran; inspect app state before retrying. Requests are limited to 64 KiB, responses to 16 MiB, and simultaneous socket exchanges to eight. Use transcript pagination for long meetings.
+The bridge never retries a failed mutation automatically. A lost response can mean the action ran; inspect app state before retrying. Requests are limited to 512 KiB, responses to 16 MiB, and simultaneous socket exchanges to eight. Use transcript pagination for long meetings.
 
 ## Wiring and use
 
@@ -103,7 +114,7 @@ The workflow runs the isolated Rust permission/socket tests, Python MCP tests, U
 
 These are complementary checks: source matching catches inventory drift; behavior tests check inputs, outcomes, permissions, errors, revocation, and UI callbacks. The isolated Rust tests use a fake native backend, so they do not establish end-to-end equivalence of the Tauri adapter and capture/notes lifecycle. The live checks below cover the tested operations; remaining gaps and unsupported behavior still need explicit review. A reviewer must verify that changed behavior has adequate tests; matching names alone is insufficient.
 
-The maintenance review covers all 33 tool actions and all current public cloud commands. The November 14 update adds persistent human-controlled grants, matching UI/tool descriptions, and restart, revocation, invalid-file, and failed-save tests. Tool action names and required permission levels are unchanged.
+The maintenance review covers all current tool actions and public cloud commands. The November 14 update adds persistent human-controlled grants, matching UI/tool descriptions, and restart, revocation, invalid-file, and failed-save tests. Tool action names and required permission levels are unchanged.
 
 ## Verification
 
@@ -113,7 +124,8 @@ Run without launching PartyLine, reading its saved meetings, accessing Keychain,
 python3 tools/agent-control/check_inventory.py --base HEAD
 cargo test --manifest-path tools/agent-control/Cargo.toml --locked --offline -j 1
 python3 -m unittest discover -s tools/agent-control/tests -p 'test_*.py' -v
-node --test tools/agent-control/tests/ui.test.mjs
+node --test tools/agent-control/tests/*.test.mjs
+cargo test --manifest-path tools/meeting-library/Cargo.toml --locked --offline -j 1
 cd frontend
 ./node_modules/.bin/tsc --noEmit --incremental false
 ```
@@ -149,3 +161,31 @@ To repeat the native key test, build a disposable app with bundle ID `com.heycha
 The cached UI view can briefly lag a successful action acknowledgement; poll status for the resulting view state. Local evidence is in `target/agent-control-acceptance.json`.
 
 Protocol references: [MCP stdio transport](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports) and [MCP tools](https://modelcontextprotocol.io/specification/2025-11-25/server/tools).
+
+## Recording library expansion — November 14, 2026
+
+The expanded catalog has 13 tools and 61 actions. The earlier 33-action acceptance applies to the previous build. The library additions have the coverage below; do not treat the catalog count as 61 completed live checks.
+
+Edits use `edit_version` to reject stale requests and the same native command for both clients. Editing, Trash, trimming, and redaction require a finished recording. Undo restores a saved revision. Originals remain intact. Shared transcript/audio apply exclusions; earlier notes require refresh or explicit review before sharing. Raw local meeting reads still include original passages because redaction is a sharing control, not permanent erasure. Existing copies and prior Drive backup versions remain unchanged.
+
+Playback positions use original recording seconds even after trimming. Playback uses edited WAVs, silences redacted ranges, and never starts capture. Human and agent playback use the same controller. Source, speed, position, loading, completion, and errors are visible through `playback/get` and the main UI.
+
+Chat sends retrieved, non-redacted transcript excerpts to the existing OpenAI connection. It records the searched-recording and selected-passage counts, includes clickable source records, and excludes Trash. Answers based on changed or deleted recordings are marked outdated and their content is withheld until asked again. Chat returns an accepted job before reading Keychain, exposes `phase` (`unlocking` or `answering`) while running, and supports cancellation during either phase. macOS approval remains human-controlled. Chat does not execute instructions from recordings. Search retrieval is bounded; it does not establish exhaustive review of the whole library.
+
+Drive backup stays inactive until a folder is selected in Settings. Automatic backup is on by default, as requested. Destinations must be within Google Drive for desktop. To disconnect through the tool, pass an empty `folder` string to `backup/configure`; `backup/settings` returns `folder: null`. Backup copies current audio/text as separate versions and reports local copy completion; PartyLine does not claim that Drive's cloud upload has finished. Failures and interrupted copies remain visible and retryable. Local originals and prior backups are preserved.
+
+The MCP bridge is bundled with the app. Client setup installs a stable copy into app data and configures Codex, Claude Code, or Claude Desktop. Only PartyLine's entry changes; the Desktop configuration receives a private backup. The client must reload its MCP configuration. Setup does not grant PartyLine access or expose provider keys.
+
+
+### Library acceptance
+
+- Isolated checks: 12 agent permission/socket tests, 12 meeting/model tests, 19 Python tests, 11 UI/playback tests, TypeScript, and the 13-tool/61-action inventory check. The final production app and DMG build successfully. The app signature and DMG checksum verify, and the executable and packaged MCP resources inside the DMG match the tested app.
+- Real MCP calls against a disposable six-second recording passed details/transcript/notes edits, stale-version rejection, trims, redaction/unredaction, undo, Trash/restore, search, export, and clipboard checks. Exported audio had the expected duration and exact silence over the redacted range; source WAVs were unchanged.
+- Playback passed play, pause, seek, speed and channel changes, invalid-seek rejection, and close through the actual native webview. Human title and notes edits were verified through MCP; agent edits appeared in the UI; human Copy matched the native export exactly.
+- The native folder picker opened from both UI and MCP; cancellation kept the destination unchanged. A disposable Google Drive folder received both trimmed/redacted audio tracks, transcript, notes, and metadata. Automatic backup on an edit and repeat backup succeeded. This verifies local Drive-folder copying, not completion of Google's cloud upload. The final setting is automatic backup enabled with no folder selected.
+- MCP setup registered Codex, Claude Code, and Claude Desktop. The installed bridge discovered all 13 tools and called the live app. Claude Code's CLI reported Connected. Claude configurations retained their other MCP entries; repeating Codex setup preserved all other entries. The initial Codex preservation hash changed during the test interval, so that first-install comparison is inconclusive. Existing client chats may need a restart or new chat to load the configuration.
+- A macOS Keychain prompt stopped the first live AI-answer check before any answer was accepted. The implementation now accepts the job before unlocking so progress and cancellation remain available. Live job acceptance and cancellation while Keychain is pending now pass, and the cancelled status appears in the UI. Clicking a retrieved source opens and plays the correct audio; changing its recording marks the stored reply outdated and clears the returned answer/sources. A regression test covers opening a different recording during playback load. On November 15, after the human approved Keychain, the existing request completed with the correct decision and owner and valid citations. Its answer appeared in the app. The helper resumed that same reply, verified its result, invalidated it by changing the source, and verified cancellation of a subsequent answer. No duplicate request was used to finish the pending test. Cross-recording retrieval also has a shared-library regression test covering multiple calls, Trash, and redactions.
+
+Local evidence is in `target/partyline-library-live.json` and `target/partyline-library-preservation.json`. The repeatable manual helper is `tools/meeting-library/tests/live_library.py`; it requires the explicitly disposable fixture pointer in `target/partyline-library-fixture.json`. It never reads or prints API-key values. Real recordings were not used for these tests. All nine pre-existing meeting/audio files matched their pre-test hashes after validation. The verified app was installed at `/Applications/PartyLine.app`; its recordings, saved connections, and Control grant remained available.
+
+References: [Tauri asset URLs](https://v2.tauri.app/reference/javascript/api/namespacecore/#convertfilesrc), [Codex MCP setup](https://developers.openai.com/codex/mcp), and [Claude Desktop local MCP setup](https://modelcontextprotocol.io/docs/develop/connect-local-servers).

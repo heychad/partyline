@@ -8,11 +8,11 @@ use std::{
 
 // SSE bytes may split within UTF-8 characters or between either newline in a separator.
 #[derive(Default)]
-struct Sse {
+pub(super) struct Sse {
     buffer: Vec<u8>,
 }
 impl Sse {
-    fn push(&mut self, bytes: &[u8]) -> Result<Vec<Value>, String> {
+    pub(super) fn push(&mut self, bytes: &[u8]) -> Result<Vec<Value>, String> {
         self.buffer.extend_from_slice(bytes);
         if self.buffer.len() > 2_000_000 {
             return Err("The notes response was too large.".into());
@@ -86,8 +86,11 @@ pub async fn generate(
 ) -> Result<String, String> {
     let _guard = s.notes_lock.lock().await;
     let snapshot = s.meeting.lock().await.clone();
+    if snapshot.deleted_at.is_some() { return Err("Restore this meeting before refreshing notes.".into()); }
     let transcript = snapshot.transcript();
     if transcript.is_empty() {
+        { let mut m=s.meeting.lock().await;m.notes.clear();m.notes_draft.clear();m.notes_status="idle".into();m.notes_need_review=false;m.notes_error=None;m.notes_revision=m.revision; }
+        s.publish(true).await;
         return Ok(transcript);
     }
     {
@@ -174,6 +177,7 @@ pub async fn generate(
                 m.notes = draft;
                 m.notes_revision = snapshot.revision;
                 m.notes_error = None;
+                m.notes_need_review = false;
                 Ok(transcript)
             }
             Ok(_) => {

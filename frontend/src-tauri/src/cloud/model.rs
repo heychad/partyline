@@ -22,6 +22,12 @@ pub struct Turn {
     pub words: Vec<Word>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TimeRange {
+    pub id: String,
+    pub start: f64,
+    pub end: f64,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Meeting {
     pub id: String,
     pub title: String,
@@ -48,6 +54,20 @@ pub struct Meeting {
     pub speaker_revision: u64,
     #[serde(default)]
     pub notes_revision: u64,
+    #[serde(default)]
+    pub edit_version: u64,
+    #[serde(default)]
+    pub undo_version: Option<u64>,
+    #[serde(default)]
+    pub trim_start: f64,
+    #[serde(default)]
+    pub trim_end: Option<f64>,
+    #[serde(default)]
+    pub redactions: Vec<TimeRange>,
+    #[serde(default)]
+    pub deleted_at: Option<String>,
+    #[serde(default)]
+    pub notes_need_review: bool,
 }
 impl Meeting {
     pub fn new(title: String, participants: Vec<String>) -> Self {
@@ -69,6 +89,13 @@ impl Meeting {
             revision: 0,
             speaker_revision: 0,
             notes_revision: 0,
+            edit_version: 0,
+            undo_version: None,
+            trim_start: 0.0,
+            trim_end: None,
+            redactions: Vec::new(),
+            deleted_at: None,
+            notes_need_review: false,
         }
     }
     pub fn display_name(&self, speaker: &str) -> String {
@@ -96,54 +123,32 @@ impl Meeting {
         turns.sort_by(|a, b| a.start.total_cmp(&b.start).then(a.id.cmp(&b.id)));
         turns
     }
+    pub fn included(&self, start: f64, end: f64) -> bool {
+        start >= self.trim_start && end <= self.trim_end.unwrap_or(f64::MAX)
+            && !self.redactions.iter().any(|r| start < r.end && end > r.start)
+    }
+    pub fn turn_transcript(&self, t: &Turn) -> String {
+        if !t.final_text { return String::new(); }
+        if t.words.is_empty() {
+            return if self.included(t.start,t.end) { format!("[{}] {}: {}",stamp(t.start),self.display_name(&t.speaker),t.text) } else { String::new() };
+        }
+        let mut lines=Vec::new();let mut speaker=String::new();let mut text=String::new();let mut start=t.start;
+        for word in &t.words {
+            if !self.included(word.start,word.end) {
+                if !text.is_empty(){lines.push(format!("[{}] {}: {}",stamp(start),self.display_name(&speaker),text));text.clear();}
+                speaker.clear();continue;
+            }
+            if word.speaker!=speaker {
+                if !text.is_empty(){lines.push(format!("[{}] {}: {}",stamp(start),self.display_name(&speaker),text));text.clear();}
+                speaker=word.speaker.clone();start=word.start;
+            }
+            if !text.is_empty(){text.push(' ');}text.push_str(&word.text);
+        }
+        if !text.is_empty(){lines.push(format!("[{}] {}: {}",stamp(start),self.display_name(&speaker),text));}
+        lines.join("\n")
+    }
     pub fn transcript(&self) -> String {
-        self.ordered_turns()
-            .into_iter()
-            .filter(|t| t.final_text)
-            .map(|t| {
-                if t.words.is_empty() {
-                    return format!(
-                        "[{}] {}: {}",
-                        stamp(t.start),
-                        self.display_name(&t.speaker),
-                        t.text
-                    );
-                }
-                let mut lines = Vec::new();
-                let mut speaker = String::new();
-                let mut text = String::new();
-                let mut start = t.start;
-                for w in &t.words {
-                    if w.speaker != speaker {
-                        if !text.is_empty() {
-                            lines.push(format!(
-                                "[{}] {}: {}",
-                                stamp(start),
-                                self.display_name(&speaker),
-                                text
-                            ));
-                        }
-                        speaker = w.speaker.clone();
-                        text.clear();
-                        start = w.start;
-                    }
-                    if !text.is_empty() {
-                        text.push(' ');
-                    }
-                    text.push_str(&w.text);
-                }
-                if !text.is_empty() {
-                    lines.push(format!(
-                        "[{}] {}: {}",
-                        stamp(start),
-                        self.display_name(&speaker),
-                        text
-                    ));
-                }
-                lines.join("\n")
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
+        self.ordered_turns().into_iter().map(|t|self.turn_transcript(t)).filter(|text|!text.is_empty()).collect::<Vec<_>>().join("\n")
     }
     pub fn apply(&mut self, channel: &str, generation: u32, offset: f64, event: &Value) -> bool {
         let kind = event["type"].as_str().unwrap_or("");

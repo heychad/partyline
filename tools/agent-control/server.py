@@ -8,9 +8,11 @@ import socket
 import stat
 import sys
 
-CATALOG = Path(__file__).resolve().parents[2] / 'frontend/src-tauri/src/agent_control/tools.json'
+CATALOG = Path(__file__).resolve().with_name('tools.json')
+if not CATALOG.is_file():
+    CATALOG = Path(__file__).resolve().parents[2] / 'frontend/src-tauri/src/agent_control/tools.json'
 DEFAULT_SOCKET = Path.home() / 'Library/Application Support/com.heychad.partyline/agent-control/control.sock'
-MAX_INPUT = 64 * 1024
+MAX_INPUT = 512 * 1024
 MAX_OUTPUT = 16 * 1024 * 1024
 VERSIONS = ('2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05')
 

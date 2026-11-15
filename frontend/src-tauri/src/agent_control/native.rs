@@ -48,7 +48,7 @@ impl Native {
             self.pending.lock().unwrap().remove(&id);
             return Err("Could not reach the PartyLine window.".into());
         }
-        let result = tokio::time::timeout(Duration::from_secs(5), receiver).await;
+        let result = tokio::time::timeout(Duration::from_secs(50), receiver).await;
         self.pending.lock().unwrap().remove(&id);
         match result {
             Ok(Ok(true)) => Ok(json!({"ok":true})),
@@ -135,8 +135,9 @@ impl Backend for Native {
                     json!({"app":"PartyLine","version":env!("CARGO_PKG_VERSION"),"current":current,
                     "view":self.view.lock().unwrap().clone(),
                     "connections":{"assemblyai":keys.assemblyai,"openai":keys.openai},
-                    "capabilities":{"transcript_text_edit":false,"live_input_switch":false,
-                        "meeting_delete":false,"live_participant_list_edit":false,"update_check":false},
+                    "capabilities":{"transcript_text_edit":true,"live_input_switch":false,
+                        "meeting_delete":true,"recoverable_trash":true,"trim":true,"redaction":true,"playback":true,
+                        "live_participant_list_edit":false,"update_check":false},
                     "permission_scope":"Cloud meetings in this macOS app. Agent access is saved until changed in PartyLine."}),
                 )
             }
@@ -202,6 +203,41 @@ impl Backend for Native {
             ("partyline_meetings", "get") => {
                 Ok(json!(crate::cloud::cloud_get(self.app.clone(), id).await?))
             }
+            ("partyline_meetings", "library") => crate::cloud::operations::cloud_library(self.app.clone(),arguments["trash"].as_bool().unwrap_or(false),text(&arguments,"query")).await,
+            ("partyline_meetings", "search") => crate::cloud::operations::cloud_search(self.app.clone(),text(&arguments,"query"),arguments["limit"].as_u64().unwrap_or(50) as usize).await,
+            ("partyline_meetings", "update" | "edit_turn" | "trim" | "redact" | "unredact" | "trash" | "restore" | "undo") => {
+                use crate::cloud::library::Edit;
+                let edit=match action {
+                    "update"=>Edit::Details{title:text(&arguments,"title"),participants:arguments["participants"].as_array().unwrap().iter().map(|p|p.as_str().unwrap().to_owned()).collect()},
+                    "edit_turn"=>Edit::Transcript{turn_id:text(&arguments,"turn_id"),text:text(&arguments,"text"),start:arguments["start"].as_f64(),end:arguments["end"].as_f64()},
+                    "trim"=>Edit::Trim{start:arguments["start"].as_f64().unwrap(),end:arguments["end"].as_f64().unwrap()},
+                    "redact"=>Edit::Redact{start:arguments["start"].as_f64().unwrap(),end:arguments["end"].as_f64().unwrap()},
+                    "unredact"=>Edit::Unredact{redaction_id:text(&arguments,"redaction_id")},
+                    "trash"=>Edit::Trash,"restore"=>Edit::Restore,_=>Edit::Undo,
+                };
+                Ok(json!({"meeting":crate::cloud::operations::cloud_edit(self.app.clone(),id,arguments["expected_version"].as_u64().unwrap(),edit).await?}))
+            }
+            ("partyline_notes", "edit") => Ok(json!({"meeting":crate::cloud::operations::cloud_edit(self.app.clone(),id,arguments["expected_version"].as_u64().unwrap(),crate::cloud::library::Edit::Notes{text:text(&arguments,"text")}).await?})),
+            ("partyline_export", "text") => crate::cloud::operations::cloud_share(self.app.clone(),id,text(&arguments,"content"),text(&arguments,"format"),arguments["clipboard"].as_bool().unwrap_or(false)).await,
+            ("partyline_export", "audio") => crate::cloud::operations::cloud_audio(self.app.clone(),id,text(&arguments,"channel")).await,
+            ("partyline_playback", "get") => Ok(json!({"playback":self.view.lock().unwrap().get("playback").cloned().unwrap_or(Value::Null)})),
+            ("partyline_playback", "set") => { self.idle().await?; self.ui("playback",arguments).await },
+            ("partyline_playback", "close") => self.ui("playback_close",json!({})).await,
+            ("partyline_workspace", "get") => Ok(json!({"workspace":self.view.lock().unwrap().get("workspace").cloned().unwrap_or(Value::Null)})),
+            ("partyline_workspace", "set") => self.ui("workspace",arguments).await,
+            ("partyline_chat", "list") => crate::cloud::chat::cloud_chat_list(self.app.clone()).await,
+            ("partyline_chat", "ask") => {
+                let mut result=crate::cloud::chat::cloud_chat_ask(self.app.clone(),text(&arguments,"question"),arguments["meeting_id"].as_str().map(String::from)).await?;
+                result["ui_synced"]=json!(self.ui("workspace",json!({"panel":"chat"})).await.is_ok());Ok(result)
+            }
+            ("partyline_chat", "cancel") => crate::cloud::chat::cloud_chat_cancel(id).await,
+            ("partyline_backup", "settings") => Ok(json!(crate::cloud::backup::cloud_backup_settings(self.app.clone())?)),
+            ("partyline_backup", "configure") => Ok(json!(crate::cloud::backup::cloud_backup_configure(self.app.clone(),arguments["automatic"].as_bool().unwrap(),Some(text(&arguments,"folder")))?)),
+            ("partyline_backup", "choose_folder") => crate::cloud::backup::cloud_backup_choose_folder(self.app.clone()).await,
+            ("partyline_backup", "status") => crate::cloud::backup::cloud_backup_status(self.app.clone()),
+            ("partyline_backup", "start") => crate::cloud::backup::cloud_backup_start(self.app.clone(),id).await,
+            ("partyline_clients", "status") => crate::cloud::clients::cloud_client_status(self.app.clone()),
+            ("partyline_clients", "setup") => crate::cloud::clients::cloud_client_setup(self.app.clone(),text(&arguments,"client")).await,
             ("partyline_meetings", "transcript") => {
                 let m = crate::cloud::cloud_get(self.app.clone(), id).await?;
                 let final_only = arguments["final_only"].as_bool().unwrap_or(false);

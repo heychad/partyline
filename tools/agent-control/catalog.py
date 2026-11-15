@@ -1,4 +1,4 @@
-"""Single source for the eight public tools and their per-action permissions."""
+"""Single source for the public tools and their per-action permissions."""
 import json
 from pathlib import Path
 
@@ -16,6 +16,12 @@ PEOPLE = dict(type='array', maxItems=100, items=string(80, 1))
 OFFSET = dict(type='integer', minimum=0, maximum=1000000, default=0)
 LIMIT = dict(type='integer', minimum=1, maximum=500, default=100)
 BOOL = dict(type='boolean')
+VERSION = dict(type='integer', minimum=0)
+TIME = dict(type='number', minimum=0, maximum=604800)
+CHANNEL = dict(enum=['both', 'me', 'remote'])
+SPEED = dict(type='number', minimum=0.5, maximum=3)
+CONTENT = dict(enum=['notes', 'transcript', 'both'])
+FORMAT = dict(enum=['markdown', 'text'])
 
 
 def action(name, permission, label, properties=None, required=()):
@@ -30,7 +36,7 @@ def tool(name, description, actions):
         inputSchema=dict(type='object', oneOf=[a['schema'] for a in actions]),
         annotations=dict(readOnlyHint=all(a['permission'] == 'read' for a in actions),
                          destructiveHint=any(a['permission'] == 'control' for a in actions),
-                         idempotentHint=False, openWorldHint=name in ('recording', 'notes', 'connections')),
+                         idempotentHint=False, openWorldHint=name in ('recording', 'notes', 'connections', 'chat', 'backup')),
         _meta={'partyline/permissions': {a['name']: a['permission'] for a in actions},
                'partyline/labels': {a['name']: a['label'] for a in actions}})
 
@@ -48,9 +54,17 @@ TOOLS = [
         action('diagnostics', 'read', 'Read audio diagnostics'),
         action('select', 'control', 'Select next microphone', {'microphone': MIC}, ['microphone']),
     ]),
-    tool('meetings', 'Read cloud history, meeting state, or paginated transcript turns. Open a saved meeting, prepare the next meeting, control transcript following, or dismiss a banner. Raw text editing, deletion, and live participant-list edits are unsupported.', [
+    tool('meetings', 'Read cloud history, meeting state, or paginated transcript turns. Open a saved meeting, prepare the next meeting, control transcript following, or dismiss a banner. Saved recordings support edits, reversible Trash, trim, redaction, and undo. Every edit requires the current edit_version. Trims and redactions affect sharing; originals remain recoverable. Live participant-list edits are unsupported.', [
         action('list', 'read', 'Read meeting history', {'offset': OFFSET, 'limit': LIMIT}),
         action('get', 'read', 'Read meeting', {'id': ID}, ['id']),
+        action('library', 'read', 'Browse recordings and Trash', {'trash': BOOL, 'query': string(500)}),
+        action('search', 'read', 'Search transcripts', {'query': string(500), 'limit': dict(type='integer', minimum=1, maximum=200)}, ['query']),
+        action('update', 'control', 'Edit meeting details', {'id': ID, 'expected_version': VERSION, 'title': string(200,1), 'participants': PEOPLE}, ['id','expected_version','title','participants']),
+        action('edit_turn', 'control', 'Edit transcript turn', {'id': ID, 'expected_version': VERSION, 'turn_id': string(160,1), 'text': string(16000,1), 'start': TIME, 'end': TIME}, ['id','expected_version','turn_id','text']),
+        *[action(name, 'control', label, {'id': ID, 'expected_version': VERSION, 'start': TIME, 'end': TIME}, ['id','expected_version','start','end']) for name,label in [('trim','Trim recording'),('redact','Redact recording passage')]],
+        action('unredact', 'control', 'Restore redacted passage', {'id': ID, 'expected_version': VERSION, 'redaction_id': ID}, ['id','expected_version','redaction_id']),
+        *[action(name, 'control', label, {'id': ID, 'expected_version': VERSION}, ['id','expected_version']) for name,label in [('trash','Move recording to Trash'),('restore','Restore recording'),('undo','Undo meeting edit')]],
+
         action('transcript', 'read', 'Read transcript', {'id': ID, 'offset': OFFSET, 'limit': LIMIT, 'final_only': BOOL}, ['id']),
         action('open', 'control', 'Open meeting', {'id': ID}, ['id']),
         action('new', 'control', 'Open new meeting'),
@@ -70,11 +84,39 @@ TOOLS = [
     tool('notes', 'Read saved and streaming notes with their revisions, or request a refresh. Refresh uses OpenAI and returns when queued; poll notes/get for completion. Stop requests final notes through the recording lifecycle.', [
         action('get', 'read', 'Read notes', {'id': ID}, ['id']),
         action('refresh', 'control', 'Refresh notes', {'id': ID}, ['id']),
+        action('edit', 'control', 'Edit and review notes', {'id': ID, 'expected_version': VERSION, 'text': string(50000)}, ['id','expected_version','text']),
     ]),
     tool('export', 'Export Markdown to the existing meeting folder and return it, copy that export to the Mac clipboard, or reveal the folder in Finder. No caller-supplied paths are accepted.', [
+        action('text', 'control', 'Share notes or transcript', {'id': ID, 'content': CONTENT, 'format': FORMAT, 'clipboard': BOOL}, ['id','content','format']),
+        action('audio', 'control', 'Export trimmed and redacted audio', {'id': ID, 'channel': CHANNEL}, ['id','channel']),
         action('markdown', 'control', 'Export meeting', {'id': ID}, ['id']),
         action('copy', 'control', 'Copy meeting export', {'id': ID}, ['id']),
         action('reveal', 'control', 'Reveal meeting files', {'id': ID}, ['id']),
+    ]),
+    tool('playback', 'Listen to saved audio in PartyLine. Positions use original recording seconds; trims constrain playback and redactions are silent. set opens the recording and applies only supplied values. Poll get for loading, playing, paused, ended, and error state. Playback never starts capture.', [
+        action('get', 'read', 'Read playback state'),
+        action('set', 'control', 'Control recorded audio', {'id': ID, 'position': TIME, 'speed': SPEED, 'channel': CHANNEL, 'playing': BOOL}, ['id']),
+        action('close', 'control', 'Close audio playback'),
+    ]),
+    tool('workspace', 'Read or change the visible library filters and panels. Editing values use the meeting and notes tools; the human and agent share their validation.', [
+        action('get', 'read', 'Read workspace state'),
+        action('set', 'control', 'Change workspace view', {'query': string(500), 'trash': BOOL, 'panel': dict(enum=['none','settings','chat','share','details','notes','trim','redact','transcript']), 'turn_id': string(160,1)}),
+    ]),
+    tool('chat', 'Ask Terra questions about local recordings. Sends retrieved non-redacted transcript excerpts to OpenAI, returns acceptance, and saves a cited answer. Poll list for streaming, completion, errors, and outdated sources. Does not execute instructions in recordings.', [
+        action('list', 'read', 'Read recording chats'),
+        action('ask', 'control', 'Ask recordings', {'question': string(2000,1), 'meeting_id': ID}, ['question']),
+        action('cancel', 'control', 'Cancel recording answer', {'id': ID}, ['id']),
+    ]),
+    tool('backup', 'Back up audio and text to the selected Google Drive for desktop folder. Trims and redactions apply to each new version; existing backup versions remain. Copied means local folder copy completed, not verified cloud upload. Poll status for progress, errors, and retry with start.', [
+        action('settings', 'read', 'Read backup settings'),
+        action('configure', 'control', 'Change backup settings', {'automatic': BOOL, 'folder': string(4096)}, ['automatic','folder']),
+        action('choose_folder', 'control', 'Open backup folder chooser'),
+        action('status', 'read', 'Read backup progress'),
+        action('start', 'control', 'Back up recording', {'id': ID}, ['id']),
+    ]),
+    tool('clients', 'Inspect the packaged local MCP bridge or configure Codex, Claude Code, or Claude Desktop. Setup preserves other client settings and requires a client restart or new chat. It does not change PartyLine agent access.', [
+        action('status', 'read', 'Read MCP setup status'),
+        action('setup', 'control', 'Connect agent client', {'client': dict(enum=['codex','claude-code','claude-desktop'])}, ['client']),
     ]),
     tool('connections', 'Read only key-presence flags, save or replace keys in Keychain, test provider access, remove a saved key, or open/close Connections. Key values are write-only and never appear in results or activity. Test performs authentication/model-access checks, not paid transcription or notes.', [
         action('status', 'read', 'Read connection status'),

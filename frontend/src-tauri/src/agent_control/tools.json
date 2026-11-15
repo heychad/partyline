@@ -168,7 +168,7 @@
   },
   {
     "name": "partyline_meetings",
-    "description": "Read cloud history, meeting state, or paginated transcript turns. Open a saved meeting, prepare the next meeting, control transcript following, or dismiss a banner. Raw text editing, deletion, and live participant-list edits are unsupported.",
+    "description": "Read cloud history, meeting state, or paginated transcript turns. Open a saved meeting, prepare the next meeting, control transcript following, or dismiss a banner. Saved recordings support edits, reversible Trash, trim, redaction, and undo. Every edit requires the current edit_version. Trims and redactions affect sharing; originals remain recoverable. Live participant-list edits are unsupported.",
     "inputSchema": {
       "type": "object",
       "oneOf": [
@@ -212,6 +212,310 @@
           "required": [
             "action",
             "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "library"
+            },
+            "trash": {
+              "type": "boolean"
+            },
+            "query": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 500
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "search"
+            },
+            "query": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 500
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          "required": [
+            "action",
+            "query"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "update"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "participants": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              }
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "expected_version",
+            "title",
+            "participants"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "edit_turn"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "turn_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16000
+            },
+            "start": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 604800
+            },
+            "end": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 604800
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "expected_version",
+            "turn_id",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "trim"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "start": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 604800
+            },
+            "end": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 604800
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "expected_version",
+            "start",
+            "end"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "redact"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "start": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 604800
+            },
+            "end": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 604800
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "expected_version",
+            "start",
+            "end"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "unredact"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "redaction_id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "expected_version",
+            "redaction_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "trash"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "expected_version"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "restore"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "expected_version"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "undo"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "expected_version"
           ],
           "additionalProperties": false
         },
@@ -359,6 +663,16 @@
       "partyline/permissions": {
         "list": "read",
         "get": "read",
+        "library": "read",
+        "search": "read",
+        "update": "control",
+        "edit_turn": "control",
+        "trim": "control",
+        "redact": "control",
+        "unredact": "control",
+        "trash": "control",
+        "restore": "control",
+        "undo": "control",
         "transcript": "read",
         "open": "control",
         "new": "control",
@@ -369,6 +683,16 @@
       "partyline/labels": {
         "list": "Read meeting history",
         "get": "Read meeting",
+        "library": "Browse recordings and Trash",
+        "search": "Search transcripts",
+        "update": "Edit meeting details",
+        "edit_turn": "Edit transcript turn",
+        "trim": "Trim recording",
+        "redact": "Redact recording passage",
+        "unredact": "Restore redacted passage",
+        "trash": "Move recording to Trash",
+        "restore": "Restore recording",
+        "undo": "Undo meeting edit",
         "transcript": "Read transcript",
         "open": "Open meeting",
         "new": "Open new meeting",
@@ -614,6 +938,36 @@
             "id"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "edit"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "text": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 50000
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "expected_version",
+            "text"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -626,11 +980,13 @@
     "_meta": {
       "partyline/permissions": {
         "get": "read",
-        "refresh": "control"
+        "refresh": "control",
+        "edit": "control"
       },
       "partyline/labels": {
         "get": "Read notes",
-        "refresh": "Refresh notes"
+        "refresh": "Refresh notes",
+        "edit": "Edit and review notes"
       }
     }
   },
@@ -640,6 +996,70 @@
     "inputSchema": {
       "type": "object",
       "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "text"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "content": {
+              "enum": [
+                "notes",
+                "transcript",
+                "both"
+              ]
+            },
+            "format": {
+              "enum": [
+                "markdown",
+                "text"
+              ]
+            },
+            "clipboard": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "content",
+            "format"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "audio"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "channel": {
+              "enum": [
+                "both",
+                "me",
+                "remote"
+              ]
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "channel"
+          ],
+          "additionalProperties": false
+        },
         {
           "type": "object",
           "properties": {
@@ -707,14 +1127,430 @@
     },
     "_meta": {
       "partyline/permissions": {
+        "text": "control",
+        "audio": "control",
         "markdown": "control",
         "copy": "control",
         "reveal": "control"
       },
       "partyline/labels": {
+        "text": "Share notes or transcript",
+        "audio": "Export trimmed and redacted audio",
         "markdown": "Export meeting",
         "copy": "Copy meeting export",
         "reveal": "Reveal meeting files"
+      }
+    }
+  },
+  {
+    "name": "partyline_playback",
+    "description": "Listen to saved audio in PartyLine. Positions use original recording seconds; trims constrain playback and redactions are silent. set opens the recording and applies only supplied values. Poll get for loading, playing, paused, ended, and error state. Playback never starts capture.",
+    "inputSchema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "get"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "set"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "position": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 604800
+            },
+            "speed": {
+              "type": "number",
+              "minimum": 0.5,
+              "maximum": 3
+            },
+            "channel": {
+              "enum": [
+                "both",
+                "me",
+                "remote"
+              ]
+            },
+            "playing": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "close"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "partyline/permissions": {
+        "get": "read",
+        "set": "control",
+        "close": "control"
+      },
+      "partyline/labels": {
+        "get": "Read playback state",
+        "set": "Control recorded audio",
+        "close": "Close audio playback"
+      }
+    }
+  },
+  {
+    "name": "partyline_workspace",
+    "description": "Read or change the visible library filters and panels. Editing values use the meeting and notes tools; the human and agent share their validation.",
+    "inputSchema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "get"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "set"
+            },
+            "query": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 500
+            },
+            "trash": {
+              "type": "boolean"
+            },
+            "panel": {
+              "enum": [
+                "none",
+                "settings",
+                "chat",
+                "share",
+                "details",
+                "notes",
+                "trim",
+                "redact",
+                "transcript"
+              ]
+            },
+            "turn_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "partyline/permissions": {
+        "get": "read",
+        "set": "control"
+      },
+      "partyline/labels": {
+        "get": "Read workspace state",
+        "set": "Change workspace view"
+      }
+    }
+  },
+  {
+    "name": "partyline_chat",
+    "description": "Ask Terra questions about local recordings. Sends retrieved non-redacted transcript excerpts to OpenAI, returns acceptance, and saves a cited answer. Poll list for streaming, completion, errors, and outdated sources. Does not execute instructions in recordings.",
+    "inputSchema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "list"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "ask"
+            },
+            "question": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            },
+            "meeting_id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "question"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "cancel"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "partyline/permissions": {
+        "list": "read",
+        "ask": "control",
+        "cancel": "control"
+      },
+      "partyline/labels": {
+        "list": "Read recording chats",
+        "ask": "Ask recordings",
+        "cancel": "Cancel recording answer"
+      }
+    }
+  },
+  {
+    "name": "partyline_backup",
+    "description": "Back up audio and text to the selected Google Drive for desktop folder. Trims and redactions apply to each new version; existing backup versions remain. Copied means local folder copy completed, not verified cloud upload. Poll status for progress, errors, and retry with start.",
+    "inputSchema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "settings"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "configure"
+            },
+            "automatic": {
+              "type": "boolean"
+            },
+            "folder": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 4096
+            }
+          },
+          "required": [
+            "action",
+            "automatic",
+            "folder"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "choose_folder"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "status"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "start"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "partyline/permissions": {
+        "settings": "read",
+        "configure": "control",
+        "choose_folder": "control",
+        "status": "read",
+        "start": "control"
+      },
+      "partyline/labels": {
+        "settings": "Read backup settings",
+        "configure": "Change backup settings",
+        "choose_folder": "Open backup folder chooser",
+        "status": "Read backup progress",
+        "start": "Back up recording"
+      }
+    }
+  },
+  {
+    "name": "partyline_clients",
+    "description": "Inspect the packaged local MCP bridge or configure Codex, Claude Code, or Claude Desktop. Setup preserves other client settings and requires a client restart or new chat. It does not change PartyLine agent access.",
+    "inputSchema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "status"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "setup"
+            },
+            "client": {
+              "enum": [
+                "codex",
+                "claude-code",
+                "claude-desktop"
+              ]
+            }
+          },
+          "required": [
+            "action",
+            "client"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "partyline/permissions": {
+        "status": "read",
+        "setup": "control"
+      },
+      "partyline/labels": {
+        "status": "Read MCP setup status",
+        "setup": "Connect agent client"
       }
     }
   },

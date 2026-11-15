@@ -4,12 +4,15 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import type { Meeting } from '../cloud/types';
+import type { PlaybackRequest, PlaybackState } from '../cloud/playback';
 
 export type KeyStatus = { assemblyai: boolean; openai: boolean };
 export type Draft = { title?: string; participants?: string[]; microphone?: string };
 export type AgentView = {
   selected_id: string | null; follow: boolean; connections_open: boolean;
   draft: { title: string; participants: string[]; microphone: string };
+  playback?: PlaybackState;
+  workspace?: { query: string; trash: boolean; panel: string; editor: Record<string, unknown> | null };
 };
 export type AgentUiRequest = { id: string; action: string; arguments: Record<string, unknown> };
 export type AgentUiHandlers = {
@@ -22,6 +25,9 @@ export type AgentUiHandlers = {
   dismiss: (target: 'error' | 'notice') => void;
   copied: () => void;
   keysChanged: (status: KeyStatus) => void;
+  playback: (request: PlaybackRequest) => Promise<void>;
+  closePlayback: () => void;
+  workspace: (request: Record<string, unknown>) => void;
 };
 
 // Kept separate so view behavior can be tested without a native window.
@@ -32,7 +38,7 @@ export async function applyAgentUiRequest(
 ): Promise<void> {
   if (handlers.busy) throw new Error('The window is busy.');
   const args = request.arguments;
-  if (['new', 'prepare', 'open'].includes(request.action)) {
+  if (['new', 'prepare', 'open', 'playback'].includes(request.action)) {
     const active = await current();
     if (active && (request.action !== 'open' || args.id !== active.id)) {
       throw new Error('Finish the active meeting first.');
@@ -48,6 +54,9 @@ export async function applyAgentUiRequest(
       if (args.target !== 'error' && args.target !== 'notice') throw new Error('Unknown banner.');
       handlers.dismiss(args.target); break;
     case 'copied': handlers.copied(); break;
+    case 'playback': await handlers.playback(args as PlaybackRequest); break;
+    case 'playback_close': handlers.closePlayback(); break;
+    case 'workspace': handlers.workspace(args); break;
     default: throw new Error('Unsupported window action.');
   }
 }

@@ -18,7 +18,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-pub const MAX_REQUEST_BYTES: usize = 64 * 1024;
+pub const MAX_REQUEST_BYTES: usize = 512 * 1024;
 pub const MAX_RESPONSE_BYTES: usize = 16 * 1024 * 1024;
 const AUDIT_LIMIT: usize = 100;
 
@@ -285,6 +285,11 @@ pub fn valid(schema: &Value, value: &Value) -> bool {
             {
                 return false;
             }
+        }
+        Some("number") => {
+            let Some(n) = value.as_f64() else { return false; };
+            if !n.is_finite() || schema["minimum"].as_f64().is_some_and(|min| n < min)
+                || schema["maximum"].as_f64().is_some_and(|max| n > max) { return false; }
         }
         Some("array") => {
             let Some(array) = value.as_array() else {

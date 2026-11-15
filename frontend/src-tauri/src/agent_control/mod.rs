@@ -78,6 +78,10 @@ struct View {
     connections_open: bool,
     ready: bool,
     draft: Draft,
+    #[serde(default)]
+    playback: Value,
+    #[serde(default)]
+    workspace: Value,
 }
 
 #[derive(Deserialize, Serialize)]

@@ -2,9 +2,13 @@
 mod assembly;
 mod capture;
 pub mod keys;
-mod model;
+pub mod library;
+pub mod operations;
+pub mod chat;
+pub mod backup;
+pub mod clients;
 mod notes;
-use model::Meeting;
+use library::model::Meeting;
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -191,6 +195,7 @@ pub async fn cloud_list(app: AppHandle) -> Result<Vec<serde_json::Value>, String
         let id = entry.file_name().to_string_lossy().into_owned();
         if let Ok(s) = get(&app, &id).await {
             let m = s.meeting.lock().await;
+            if m.deleted_at.is_some() { continue; }
             list.push(serde_json::json!({"id":m.id,"title":m.title,"created_at":m.created_at,"status":m.status}));
         }
     }
@@ -281,6 +286,7 @@ async fn run(s: Arc<Shared>, a: String, o: String, microphone: Option<String>) {
     }
     s.done.cancel();
     crate::tray::update_tray_menu(&s.app);
+    backup::automatic(s.app.clone(),s.id.clone()).await;
 }
 #[tauri::command]
 pub async fn cloud_stop() -> Result<(), String> {
@@ -321,6 +327,7 @@ pub async fn cloud_rename_speaker(
     name: String,
 ) -> Result<(), String> {
     let s = get(&app, &id).await?;
+    if s.meeting.lock().await.deleted_at.is_some() { return Err("Restore this meeting before renaming speakers.".into()); }
     if speaker == "me" || speaker.ends_with(":PENDING") || speaker.ends_with(":UNKNOWN") {
         return Err("This speaker cannot be renamed yet.".into());
     }
@@ -355,12 +362,20 @@ pub async fn cloud_rename_speaker(
 #[tauri::command]
 pub async fn cloud_refresh_notes(app: AppHandle, id: String) -> Result<(), String> {
     let s = get(&app, &id).await?;
+    if s.meeting.lock().await.deleted_at.is_some() { return Err("Restore this meeting before refreshing its notes.".into()); }
     if !s.done.is_cancelled() {
         s.force_notes.store(true, Ordering::SeqCst);
         s.notes_wake.notify_one();
         return Ok(());
     }
     let key = keys::read("openai")?;
+    let _notes = s.notes_lock.try_lock().map_err(|_| "Notes are already updating.")?;
+    { let mut m=s.meeting.lock().await;
+      if ["updating","finalizing"].contains(&m.notes_status.as_str()) { return Err("Notes are already updating.".into()); }
+      m.notes_status="updating".into();m.notes_error=None;
+    }
+    s.publish(false).await;
+    drop(_notes);
     tauri::async_runtime::spawn(async move {
         let _ = notes::generate(&s, &key, true, "").await;
     });
@@ -383,12 +398,7 @@ pub async fn cloud_reveal(app: AppHandle, id: String) -> Result<(), String> {
 pub async fn cloud_export(app: AppHandle, id: String) -> Result<String, String> {
     let s = get(&app, &id).await?;
     let m = s.meeting.lock().await.clone();
-    let text = format!(
-        "# {}\n\n{}\n\n## Transcript\n\n{}\n",
-        m.title,
-        m.notes,
-        m.transcript()
-    );
+    let text = library::export_text(&m, "both", "markdown")?;
     tokio::fs::write(s.folder.join("meeting.md"), &text)
         .await
         .map_err(|_| "Could not export this meeting.".to_string())?;
