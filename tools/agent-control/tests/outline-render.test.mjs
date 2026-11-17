@@ -73,3 +73,25 @@ test('calendar panel keeps account calendars distinct and call prompt never star
  let starts=0;let rendered;act(()=>{rendered=create(React.createElement(CalendarPrompt,{state,active:false,start:()=>starts++,open:()=>{},busy:false}));});assert.equal(starts,0);rendered.root.findAllByType('button').find(b=>b.props.children==='Record').props.onClick();assert.equal(starts,1);act(()=>rendered.update(React.createElement(CalendarPrompt,{state,active:true,start:()=>starts++,open:()=>{},busy:false})));assert.equal(rendered.toJSON(),null);act(()=>rendered.unmount());
  const now=Date.now();const event=(key,delta)=>({key,start:new Date(now+delta).toISOString(),end:new Date(now+delta+10000).toISOString()});assert.deepEqual(upcoming([event('past',-20000),event('later',5000),event('now',0),event('tomorrow',90000000)],now).map(e=>e.key),['now','later']);
 });
+
+const {ChatComposer,ChatCitations}=await import('../../../frontend/src/components/cloud/ChatControls.tsx');
+test('chat Enter submits through the form; newline, composition, repeat, blank and busy are guarded',()=>{
+ let sends=0;const props={question:'What changed?',setQuestion:()=>{},scope:'all',setScope:()=>{},currentAvailable:true,busy:false,error:'',submit:()=>sends++};
+ let rendered;act(()=>{rendered=create(React.createElement(ChatComposer,props));});
+ const press=(extra={})=>{let prevented=false;rendered.root.findByType('textarea').props.onKeyDown({key:'Enter',shiftKey:false,repeat:false,nativeEvent:{},preventDefault:()=>prevented=true,currentTarget:{form:{requestSubmit:()=>rendered.root.findByType('form').props.onSubmit({preventDefault:()=>{}})}},...extra});return prevented;};
+ assert.equal(press(),true);assert.equal(sends,1);
+ for(const extra of [{shiftKey:true},{nativeEvent:{isComposing:true}},{nativeEvent:{keyCode:229}},{key:'a'}])assert.equal(press(extra),false);
+ assert.equal(sends,1);assert.equal(press({repeat:true}),true);assert.equal(sends,1);
+ for(const extra of [{busy:true},{question:'   '}]){
+  act(()=>rendered.update(React.createElement(ChatComposer,{...props,...extra})));
+  assert.equal(rendered.root.findByType('button').props.disabled,true);press();rendered.root.findByType('form').props.onSubmit({preventDefault:()=>{}});assert.equal(sends,1);
+ }
+ act(()=>rendered.unmount());
+});
+test('chat shows only cited sources and opens their original audio positions',()=>{
+ const sources=Array.from({length:80},(_,i)=>({meeting_id:`meeting-${i}`,title:`Call ${i+1}`,start:i*10,end:i*10+5,text:'Excerpt'}));
+ const opened=[];let rendered;act(()=>{rendered=create(React.createElement(ChatCitations,{sources,indices:[57,79,58,100],open:source=>opened.push(source)}));});
+ const buttons=rendered.root.findAllByType('button');assert.equal(buttons.length,3);
+ assert.deepEqual(buttons.map(b=>b.props.children[1]),[57,79,58]);buttons[0].props.onClick();assert.deepEqual(opened,[sources[56]]);assert.equal(opened[0].start,560);
+ act(()=>rendered.update(React.createElement(ChatCitations,{sources,indices:[],open:()=>{}})));assert.equal(rendered.root.findAllByType('button').length,0);act(()=>rendered.unmount());
+});

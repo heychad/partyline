@@ -256,7 +256,7 @@ Automated checks passed: 24 UI/controller/render tests, 20 meeting-library/model
 
 An 18.79-second disposable recording started through the welcome button. Agent title/participant edits and a human title edit saved during capture; stale and blank-title edits were rejected. The recording completed without errors, with matching microphone and Mac-audio WAV durations. Mac audio carried signal; the microphone supplied samples but was silent, so this was not a speech test. No new permission prompts appeared in this test. Evidence: `target/partyline-044-acceptance.json`; repeatable helper: `tools/agent-control/tests/live_quick_start.py` with an explicitly identified test recording.
 
-The signed app is installed at `/Applications/PartyLine.app`. The installed executable, metadata, signature resources, and agent bridge/catalog match the app in `PartyLine_0.4.4_aarch64.dmg`. Control remains enabled. Eight pre-existing recordings retained their audio/meeting file sizes and modification times. Source changes remain uncommitted.
+The signed app is installed at `/Applications/PartyLine.app`. The installed executable, metadata, signature resources, and agent bridge/catalog match the app in `PartyLine_0.4.4_aarch64.dmg`. Control remains enabled. Eight pre-existing recordings retained their audio/meeting file sizes and modification times. The 0.4.2–0.4.5 source changes were committed in `d731cea`; GitHub agent-parity CI passed for that commit.
 
 ## Google Calendar and meeting detection — 0.4.5
 
@@ -282,4 +282,15 @@ The human completed consent for Personal, Stimulus, CareAtlas, and MFC. All four
 
 After quitting the idle app and reopening `/Applications/PartyLine.app`, all four accounts, selected calendars, and Control access persisted. Calendar sync completed again with 72 events and no account errors. Meeting detection remains off until the human enables it.
 
-Evidence: `target/partyline-045-calendar-acceptance.json`, `target/partyline-045-connected-acceptance.json`, `target/partyline-045-bundle-verification.json`, and `target/partyline-045-preservation-before.json`. Repeat the pre-consent checks with `python3 tools/agent-control/tests/live_calendar.py` while idle. `live_calendar_connected.py` requires at least two authorized accounts and the explicitly disposable fixture; it restores calendar selections and fixture details after testing. No new long recording, token-expiry refresh, account-removal/re-consent, or all-app detection acceptance was run for this release. Source changes remain uncommitted.
+Evidence: `target/partyline-045-calendar-acceptance.json`, `target/partyline-045-connected-acceptance.json`, `target/partyline-045-bundle-verification.json`, and `target/partyline-045-preservation-before.json`. Repeat the pre-consent checks with `python3 tools/agent-control/tests/live_calendar.py` while idle. `live_calendar_connected.py` requires at least two authorized accounts and the explicitly disposable fixture; it restores calendar selections and fixture details after testing. No new long recording, token-expiry refresh, account-removal/re-consent, or all-app detection acceptance was run for this release. The 0.4.2–0.4.5 source changes were committed in `d731cea`; GitHub agent-parity CI passed for that commit.
+
+
+### 0.4.6 chat controls and cited sources
+
+Ask recordings sends with Enter and inserts a newline with Shift+Enter. IME composition, held Enter, blank questions, and an active request cannot submit another answer. Keyboard and button submissions share the existing `cloud_chat_ask` path; the MCP `chat.ask` permission remains Control.
+
+`cloud_chat_list` and MCP `chat.list` now return `cited_source_indices` for each reply: unique, one-based source numbers in answer order. The UI renders only those source links. Original source order, citation numbers, and playback positions remain intact, including saved answers. Full retrieval context remains available in `sources` for agent inspection. Listing remains Read; the native adapter and permission rules are unchanged.
+
+Behavior checks cover actual composer callbacks, source link rendering and playback targets, and native citation selection. No new tool action or unsupported behavior was introduced.
+
+Google setup on November 17, 2026: PartyLine's OAuth audience now shows **In production**. Homepage, privacy, and terms are published at `https://heychad.github.io/partyline/`; the repository is `heychad/partyline`. Google verification has not been completed; the console retains its unverified-app user cap. Production removes the testing-mode seven-day expiration for new offline grants. Whether existing testing-issued grants inherit that change was not verified; an existing account may need one final reconnect. No grants were revoked or permissions expanded during publication.

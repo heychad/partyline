@@ -123,7 +123,7 @@ TOOLS = [
             **{k:BOOL for k in ['sidebar_visible','transcript_visible','notes_visible','chat_visible','pin_transcript']}, 'collapsed_notes': dict(type='array',maxItems=500,items=string(500))})}, ['patch']),
         action('set', 'control', 'Change workspace view', {'query': string(500), 'trash': BOOL, 'panel': dict(enum=['none','calendar','settings','chat','view','speakers','share','details','notes','trim','redact','transcript']), 'turn_id': string(160,1)}),
     ]),
-    tool('chat', 'Ask Terra questions about local recordings. Sends retrieved non-redacted transcript excerpts to OpenAI, returns acceptance, and saves a cited answer. Poll list for streaming, completion, errors, and outdated sources. Does not execute instructions in recordings.', [
+    tool('chat', 'Ask Terra questions about local recordings. Sends retrieved non-redacted transcript excerpts to OpenAI, returns acceptance, and saves a cited answer. Poll list for streaming, completion, errors, and outdated sources. Each listed reply includes cited_source_indices: the one-based source numbers displayed by the UI, in answer order. Does not execute instructions in recordings.', [
         action('list', 'read', 'Read recording chats'),
         action('ask', 'control', 'Ask recordings', {'question': string(2000,1), 'meeting_id': ID}, ['question']),
         action('cancel', 'control', 'Cancel recording answer', {'id': ID}, ['id']),

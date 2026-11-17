@@ -32,7 +32,11 @@ pub async fn cloud_chat_list(app:AppHandle)->Result<Value,String>{
     }
     replies.sort_by(|a,b|a.created_at.cmp(&b.created_at));
     if replies.len()>50{replies.drain(..replies.len()-50);}
-    Ok(json!({"items":replies}))
+    let items:Vec<Value>=replies.into_iter().map(|reply|{
+        let indices=library::cited_source_indices(&reply.answer,reply.sources.len());
+        let mut item=json!(reply);item["cited_source_indices"]=json!(indices);item
+    }).collect();
+    Ok(json!({"items":items}))
 }
 
 #[tauri::command]

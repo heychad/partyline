@@ -1,7 +1,7 @@
 {
     "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
     "productName": "PartyLine",
-    "version": "0.4.5",
+    "version": "0.4.6",
     "identifier": "com.heychad.partyline",
     "build": {
         "frontendDist": "../out",

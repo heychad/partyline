@@ -1747,7 +1747,7 @@
   },
   {
     "name": "partyline_chat",
-    "description": "Ask Terra questions about local recordings. Sends retrieved non-redacted transcript excerpts to OpenAI, returns acceptance, and saves a cited answer. Poll list for streaming, completion, errors, and outdated sources. Does not execute instructions in recordings.",
+    "description": "Ask Terra questions about local recordings. Sends retrieved non-redacted transcript excerpts to OpenAI, returns acceptance, and saves a cited answer. Poll list for streaming, completion, errors, and outdated sources. Each listed reply includes cited_source_indices: the one-based source numbers displayed by the UI, in answer order. Does not execute instructions in recordings.",
     "inputSchema": {
       "type": "object",
       "oneOf": [

@@ -209,3 +209,11 @@ fn calendar_links_are_live_versioned_and_never_infer_speaker_identity() {
  let disk:Meeting=serde_json::from_slice(&fs::read(dir.path().join("meeting.json")).unwrap()).unwrap();assert_eq!(disk.edit_version,3);assert!(disk.calendar_event.is_none());
  let mut finishing=details;finishing.status="finishing".into();assert!(lib::edited(&finishing,2,&Edit::Calendar{event:None,use_details:false}).is_err());
 }
+
+#[test]
+fn visible_citations_preserve_answer_order_and_original_source_numbers() {
+ assert_eq!(lib::cited_source_indices("Answer [57] [79] [58], again [57]",80),vec![57,79,58]);
+ assert_eq!(lib::cited_source_indices("[0] [81] [x] [] [9999999999999999999999999999999] [2]",80),vec![2]);
+ assert!(lib::cited_source_indices("No citations",80).is_empty());
+ assert!(lib::cited_source_indices("[1]",0).is_empty());
+}

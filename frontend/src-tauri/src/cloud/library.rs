@@ -277,3 +277,19 @@ pub fn validate_citations(answer:&str,count:usize)->Result<(),String>{
 
 // New live turns do not invalidate an answer about unchanged cited passages.
 pub fn sources_current(meetings:&[Meeting],sources:&[Hit])->bool{sources.iter().all(|s|meetings.iter().any(|m|m.id==s.meeting_id && m.deleted_at.is_none() && m.title==s.title && m.turns.get(&s.turn_id).is_some_and(|t|m.turn_transcript(t)==s.text && m.display_name(&t.speaker)==s.speaker)))}
+
+/// One-based source numbers in answer order, shared by the UI and MCP list.
+pub fn cited_source_indices(answer: &str, count: usize) -> Vec<usize> {
+    let mut indices = Vec::new();
+    for chunk in answer.split('[').skip(1) {
+        if let Some(end) = chunk.find(']') {
+            let label = &chunk[..end];
+            if !label.is_empty() && label.bytes().all(|c| c.is_ascii_digit()) {
+                if let Ok(index) = label.parse::<usize>() {
+                    if index > 0 && index <= count && !indices.contains(&index) { indices.push(index); }
+                }
+            }
+        }
+    }
+    indices
+}
