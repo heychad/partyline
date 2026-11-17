@@ -1,4 +1,10 @@
 use serde::Serialize;
+use std::{collections::HashMap,sync::{Mutex,OnceLock}};
+// Process-local only. Keychain remains the persistent store and the authority.
+static CACHE:OnceLock<Mutex<HashMap<String,String>>>=OnceLock::new();
+fn cache()-> &'static Mutex<HashMap<String,String>> { CACHE.get_or_init(||Mutex::new(HashMap::new())) }
+fn provider_valid(provider:&str)->Result<(),String>{if ["assemblyai","openai"].contains(&provider){Ok(())}else{Err("Unknown provider.".into())}}
+
 const SERVICE: &str = "com.heychad.partyline.cloud";
 #[derive(Serialize)]
 pub struct KeyStatus {
@@ -7,9 +13,14 @@ pub struct KeyStatus {
 }
 #[cfg(target_os = "macos")]
 pub fn read(provider: &str) -> Result<String, String> {
-    security_framework::passwords::get_generic_password(SERVICE, provider)
+    provider_valid(provider)?;
+    let mut unlocked=cache().lock().map_err(|_|"Could not unlock the connection.")?;
+    if let Some(key)=unlocked.get(provider){return Ok(key.clone());}
+    let key=security_framework::passwords::get_generic_password(SERVICE, provider)
         .map_err(|_| format!("Enter your {} API key in Connections.", provider))
-        .and_then(|v| String::from_utf8(v).map_err(|_| "Invalid saved API key.".into()))
+        .and_then(|v| String::from_utf8(v).map_err(|_| "Invalid saved API key.".to_string()))?;
+    unlocked.insert(provider.into(),key.clone());
+    Ok(key)
 }
 #[cfg(not(target_os = "macos"))]
 pub fn read(_provider: &str) -> Result<String, String> {
@@ -49,8 +60,12 @@ pub fn cloud_save_keys(
                 return Err("An API key contains whitespace or is too long.".into());
             }
             #[cfg(target_os = "macos")]
-            security_framework::passwords::set_generic_password(SERVICE, provider, key.as_bytes())
-                .map_err(|_| "Could not save the API key in Keychain.".to_string())?;
+            {
+                let mut unlocked=cache().lock().map_err(|_|"Could not unlock the connection.")?;
+                security_framework::passwords::set_generic_password(SERVICE, provider, key.as_bytes())
+                    .map_err(|_| "Could not save the API key in Keychain.".to_string())?;
+                unlocked.insert(provider.into(),key.into());
+            }
             #[cfg(not(target_os = "macos"))]
             return Err("Cloud key storage currently requires macOS.".into());
         }
@@ -63,14 +78,17 @@ pub fn cloud_remove_key(provider: String) -> Result<KeyStatus, String> {
         return Err("Unknown provider.".into());
     }
     #[cfg(target_os = "macos")]
-    security_framework::passwords::delete_generic_password(SERVICE, &provider)
-        .map_err(|_| "Could not remove the API key from Keychain.".to_string())?;
+    {
+        let mut unlocked=cache().lock().map_err(|_|"Could not unlock the connection.")?;
+        security_framework::passwords::delete_generic_password(SERVICE, &provider)
+            .map_err(|_| "Could not remove the API key from Keychain.".to_string())?;
+        unlocked.remove(&provider);
+    }
     Ok(cloud_key_status())
 }
 #[tauri::command]
 pub async fn cloud_test_keys() -> Result<String, String> {
-    let a = read("assemblyai")?;
-    let o = read("openai")?;
+    let (a,o)=tokio::task::spawn_blocking(|| -> Result<_,String>{Ok((read("assemblyai")?,read("openai")?))}).await.map_err(|_|"Could not unlock connections.")??;
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(20))
         .build()

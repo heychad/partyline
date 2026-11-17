@@ -12,7 +12,7 @@ export type AgentView = {
   selected_id: string | null; follow: boolean; connections_open: boolean;
   draft: { title: string; participants: string[]; microphone: string };
   playback?: PlaybackState;
-  workspace?: { query: string; trash: boolean; panel: string; editor: Record<string, unknown> | null };
+  workspace?: { outline?: unknown; transcript?: unknown; preferences?: unknown; query: string; trash: boolean; panel: string; editor: Record<string, unknown> | null };
 };
 export type AgentUiRequest = { id: string; action: string; arguments: Record<string, unknown> };
 export type AgentUiHandlers = {
@@ -27,7 +27,7 @@ export type AgentUiHandlers = {
   keysChanged: (status: KeyStatus) => void;
   playback: (request: PlaybackRequest) => Promise<void>;
   closePlayback: () => void;
-  workspace: (request: Record<string, unknown>) => void;
+  workspace: (request: Record<string, unknown>) => unknown | Promise<unknown>;
 };
 
 // Kept separate so view behavior can be tested without a native window.
@@ -35,7 +35,7 @@ export async function applyAgentUiRequest(
   request: AgentUiRequest,
   handlers: AgentUiHandlers,
   current: () => Promise<Meeting | null>,
-): Promise<void> {
+): Promise<unknown> {
   if (handlers.busy) throw new Error('The window is busy.');
   const args = request.arguments;
   if (['new', 'prepare', 'open', 'playback'].includes(request.action)) {
@@ -56,7 +56,7 @@ export async function applyAgentUiRequest(
     case 'copied': handlers.copied(); break;
     case 'playback': await handlers.playback(args as PlaybackRequest); break;
     case 'playback_close': handlers.closePlayback(); break;
-    case 'workspace': handlers.workspace(args); break;
+    case 'workspace': return await handlers.workspace(args);
     default: throw new Error('Unsupported window action.');
   }
 }
@@ -70,8 +70,8 @@ export function useCloudAgentBridge(handlers: AgentUiHandlers) {
     async function attach() {
       const off = await listen<AgentUiRequest>('partyline-agent-ui', ({ payload }) => {
         void applyAgentUiRequest(payload, latest.current, () => invoke<Meeting | null>('cloud_current'))
-          .then(() => true, () => false)
-          .then(ok => invoke('plugin:agent-control|ui_result', { id: payload.id, ok }))
+          .then(result => ({ok:true,result:result??{ok:true},error:null}), error => ({ok:false,result:null,error:error instanceof Error?error.message:String(error)}))
+          .then(result => invoke('plugin:agent-control|ui_result', { id: payload.id, ...result }))
           .catch(() => {});
       });
       if (disposed) { off(); return; }

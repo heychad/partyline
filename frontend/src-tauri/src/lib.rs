@@ -478,6 +478,7 @@ pub fn run() {
         .manage(audio::init_system_audio_state())
         .manage(summary::summary_engine::ModelManagerState(Arc::new(tokio::sync::Mutex::new(None))))
         .setup(|_app| {
+            cloud::calendar::initialize(_app.handle().clone());
             #[cfg(target_os = "windows")]
             match _app.path().resolve(
                 "onnxruntime.dll",
@@ -613,9 +614,14 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            cloud::calendar::cloud_calendar_action, cloud::calendar::cloud_calendar_link,
             cloud::keys::cloud_key_status, cloud::keys::cloud_save_keys, cloud::keys::cloud_remove_key, cloud::keys::cloud_test_keys,
             cloud::cloud_current, cloud::cloud_get, cloud::cloud_list, cloud::cloud_start, cloud::cloud_stop, cloud::cloud_pause,
-            cloud::cloud_rename_speaker, cloud::cloud_refresh_notes, cloud::cloud_reveal, cloud::cloud_export,
+            cloud::cloud_merge_speakers, cloud::cloud_undo_speaker_merge, cloud::cloud_rename_speaker, cloud::cloud_refresh_notes, cloud::cloud_reveal, cloud::cloud_export,
+            cloud::preferences::cloud_preferences, cloud::preferences::cloud_preferences_update,
+            cloud::preferences::cloud_outline, cloud::preferences::cloud_outline_update,
+            cloud::setup::cloud_setup_status, cloud::setup::cloud_setup_start, cloud::setup::cloud_setup_cancel,
+            cloud::recovery::cloud_recovery_start, cloud::recovery::cloud_recovery_cancel,
             cloud::operations::cloud_library, cloud::operations::cloud_edit, cloud::operations::cloud_search,
             cloud::operations::cloud_audio, cloud::operations::cloud_share,
             cloud::chat::cloud_chat_list, cloud::chat::cloud_chat_ask, cloud::chat::cloud_chat_cancel,

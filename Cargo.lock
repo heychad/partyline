@@ -3617,10 +3617,11 @@ dependencies = [
 
 [[package]]
 name = "meetily"
-version = "0.4.1"
+version = "0.4.5"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64 0.22.1",
  "bytemuck",
  "bytes",
  "chrono",

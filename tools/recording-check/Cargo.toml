@@ -1,0 +1,16 @@
+[package]
+name = "partyline-recording-check"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[lib]
+path = "../../frontend/src-tauri/src/cloud/archive.rs"
+
+[dependencies]
+hound = "3.5"
+
+[dev-dependencies]
+tempfile = "3"

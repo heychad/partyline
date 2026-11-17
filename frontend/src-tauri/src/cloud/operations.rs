@@ -28,7 +28,9 @@ pub async fn cloud_library(app: AppHandle, trash: bool, query: String) -> Result
 #[tauri::command]
 pub async fn cloud_edit(app: AppHandle, id: String, expected_version: u64, edit: Edit) -> Result<Meeting, String> {
     let s = get(&app, &id).await?;
-    let _notes = s.notes_lock.try_lock().map_err(|_| "Wait for notes to finish, then save your edit.")?;
+    let _notes = if matches!(edit, Edit::Details { .. } | Edit::Calendar { .. }) { None } else {
+        Some(s.notes_lock.try_lock().map_err(|_| "Wait for notes to finish, then save your edit.")?)
+    };
     let _write = s.write_lock.lock().await;
     let mut current = s.meeting.lock().await;
     let folder = s.folder.clone(); let snapshot = current.clone();
@@ -38,7 +40,7 @@ pub async fn cloud_edit(app: AppHandle, id: String, expected_version: u64, edit:
     let _ = app.emit("cloud-meeting", &next);
     let _ = app.emit("cloud-library", json!({"id":id,"edit_version":next.edit_version}));
     let backup_app=app.clone();let backup_id=id.clone();
-    if next.deleted_at.is_none() { tauri::async_runtime::spawn(async move { super::backup::automatic(backup_app,backup_id).await; }); }
+    if next.deleted_at.is_none() && ["complete","interrupted"].contains(&next.status.as_str()) { tauri::async_runtime::spawn(async move { super::backup::automatic(backup_app,backup_id).await; }); }
     Ok(next)
 }
 

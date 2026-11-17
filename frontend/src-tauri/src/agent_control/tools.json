@@ -98,7 +98,7 @@
   },
   {
     "name": "partyline_audio",
-    "description": "List inputs, inspect timestamped live audio levels and connection warnings, or select the next microphone in the setup form. Diagnostics do not start capture. Device changes during recording are unsupported.",
+    "description": "List inputs, inspect timestamped live audio levels and connection warnings, or select the next microphone in the setup form. Diagnostics include durable audio seconds, per-channel live-copy losses, and recovery state. Diagnostics do not start capture. Device changes during recording are unsupported.",
     "inputSchema": {
       "type": "object",
       "oneOf": [
@@ -107,6 +107,48 @@
           "properties": {
             "action": {
               "const": "list"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "setup_status"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "setup_start"
+            },
+            "microphone": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 512,
+              "description": "Input name from partyline_audio/list; empty means system default."
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "setup_cancel"
             }
           },
           "required": [
@@ -156,11 +198,17 @@
     "_meta": {
       "partyline/permissions": {
         "list": "read",
+        "setup_status": "read",
+        "setup_start": "control",
+        "setup_cancel": "control",
         "diagnostics": "read",
         "select": "control"
       },
       "partyline/labels": {
         "list": "List microphones",
+        "setup_status": "Read setup progress, signal observations, and errors",
+        "setup_start": "Unlock saved connections and check both audio inputs for eight seconds; no audio saved or uploaded. Unavailable during recording.",
+        "setup_cancel": "Cancel the audio setup check; macOS approval may still need to be dismissed",
         "diagnostics": "Read audio diagnostics",
         "select": "Select next microphone"
       }
@@ -168,7 +216,7 @@
   },
   {
     "name": "partyline_meetings",
-    "description": "Read cloud history, meeting state, or paginated transcript turns. Open a saved meeting, prepare the next meeting, control transcript following, or dismiss a banner. Saved recordings support edits, reversible Trash, trim, redaction, and undo. Every edit requires the current edit_version. Trims and redactions affect sharing; originals remain recoverable. Live participant-list edits are unsupported.",
+    "description": "Read cloud history, meeting state, or paginated transcript turns. Open a saved meeting, prepare the next meeting, control transcript following, or dismiss a banner. Saved recordings support edits, reversible Trash, trim, redaction, and undo. Every edit requires the current edit_version. Trims and redactions affect sharing; originals remain recoverable. Title and participant suggestions can be edited during recording; suggestions never assign voices.",
     "inputSchema": {
       "type": "object",
       "oneOf": [
@@ -685,7 +733,7 @@
         "get": "Read meeting",
         "library": "Browse recordings and Trash",
         "search": "Search transcripts",
-        "update": "Edit meeting details",
+        "update": "Edit title and participants, including during recording",
         "edit_turn": "Edit transcript turn",
         "trim": "Trim recording",
         "redact": "Redact recording passage",
@@ -849,6 +897,71 @@
           "type": "object",
           "properties": {
             "action": {
+              "const": "merge"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "sources": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 100,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 160
+              }
+            },
+            "target": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "sources",
+            "target",
+            "expected_version"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "undo_merge"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "expected_version"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
               "const": "rename"
             },
             "id": {
@@ -887,11 +1000,112 @@
     "_meta": {
       "partyline/permissions": {
         "list": "read",
+        "merge": "control",
+        "undo_merge": "control",
         "rename": "control"
       },
       "partyline/labels": {
         "list": "Read speakers",
+        "merge": "Merge speaker identities",
+        "undo_merge": "Undo speaker merge",
         "rename": "Confirm speaker name"
+      }
+    }
+  },
+  {
+    "name": "partyline_recovery",
+    "description": "Reprocess a saved audio channel with AssemblyAI. Originals and the previous transcript are preserved; undo restores the previous transcript. The selected channel is replaced, recovered remote speaker identities need confirmation, and notes need refresh. Retry resumes saved provider jobs. Cancellation stops local work; submitted provider jobs may still finish and be billed.",
+    "inputSchema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "status"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "start"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "channel": {
+              "enum": [
+                "both",
+                "me",
+                "remote"
+              ]
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "channel",
+            "expected_version"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "cancel"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "partyline/permissions": {
+        "status": "read",
+        "start": "control",
+        "cancel": "control"
+      },
+      "partyline/labels": {
+        "status": "Read recovery status",
+        "start": "Recover saved transcript",
+        "cancel": "Cancel transcript recovery"
       }
     }
   },
@@ -1254,6 +1468,215 @@
           "type": "object",
           "properties": {
             "action": {
+              "const": "transcript"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000000,
+              "default": 0
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "outline"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "outline_state"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            }
+          },
+          "required": [
+            "action",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "outline_set"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "change": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "operation": {
+                      "enum": [
+                        "collapse_all",
+                        "expand_all"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "operation"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "operation": {
+                      "const": "set"
+                    },
+                    "node_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500
+                    },
+                    "expanded": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "operation",
+                    "node_id",
+                    "expanded"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "change"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "preferences"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "configure"
+            },
+            "patch": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "notes_seconds": {
+                  "enum": [
+                    0,
+                    30,
+                    60,
+                    120,
+                    300
+                  ]
+                },
+                "sidebar_width": {
+                  "type": "integer",
+                  "minimum": 150,
+                  "maximum": 400
+                },
+                "transcript_percent": {
+                  "type": "integer",
+                  "minimum": 20,
+                  "maximum": 80
+                },
+                "chat_width": {
+                  "type": "integer",
+                  "minimum": 280,
+                  "maximum": 700
+                },
+                "sidebar_visible": {
+                  "type": "boolean"
+                },
+                "transcript_visible": {
+                  "type": "boolean"
+                },
+                "notes_visible": {
+                  "type": "boolean"
+                },
+                "chat_visible": {
+                  "type": "boolean"
+                },
+                "pin_transcript": {
+                  "type": "boolean"
+                },
+                "collapsed_notes": {
+                  "type": "array",
+                  "maxItems": 500,
+                  "items": {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "action",
+            "patch"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
               "const": "set"
             },
             "query": {
@@ -1267,8 +1690,11 @@
             "panel": {
               "enum": [
                 "none",
+                "calendar",
                 "settings",
                 "chat",
+                "view",
+                "speakers",
                 "share",
                 "details",
                 "notes",
@@ -1299,10 +1725,22 @@
     "_meta": {
       "partyline/permissions": {
         "get": "read",
+        "transcript": "read",
+        "outline": "read",
+        "outline_state": "read",
+        "outline_set": "control",
+        "preferences": "read",
+        "configure": "control",
         "set": "control"
       },
       "partyline/labels": {
         "get": "Read workspace state",
+        "transcript": "Read grouped transcript paragraphs with source turn IDs and audio ranges",
+        "outline": "Read the visible outline nodes and expansion states",
+        "outline_state": "Read saved per-recording outline state",
+        "outline_set": "Expand or collapse notes using the same persistent controls",
+        "preferences": "Read workspace preferences",
+        "configure": "Change workspace preferences",
         "set": "Change workspace view"
       }
     }
@@ -1676,6 +2114,278 @@
         "remove": "Remove connection key",
         "open": "Open Connections",
         "close": "Close Connections"
+      }
+    }
+  },
+  {
+    "name": "partyline_calendar",
+    "description": "Connect multiple Google accounts with read-only calendar access. OAuth consent stays in the system browser. Secrets are write-only in Keychain. Poll status for sign-in, refresh, errors, calendar selections, events, and local microphone-based call suggestions. Browser activity means a possible call, not a verified meeting. Never infer speaker identities from invitees. Disconnect removes this local connection; Google grants can be revoked in the Google account. No automatic recording.",
+    "inputSchema": {
+      "type": "object",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "status"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "import_client"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "configure_client"
+            },
+            "client_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            },
+            "client_secret": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          },
+          "required": [
+            "action",
+            "client_id",
+            "client_secret"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "connect"
+            },
+            "account_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "cancel"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "refresh"
+            }
+          },
+          "required": [
+            "action"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "select"
+            },
+            "account_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "calendar_ids": {
+              "type": "array",
+              "maxItems": 50,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              }
+            }
+          },
+          "required": [
+            "action",
+            "account_id",
+            "calendar_ids"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "disconnect"
+            },
+            "account_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "required": [
+            "action",
+            "account_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "detection_configure"
+            },
+            "enabled": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "action",
+            "enabled"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "dismiss"
+            },
+            "signal_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "required": [
+            "action",
+            "signal_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "link"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "event_key": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "use_details": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "expected_version",
+            "event_key",
+            "use_details"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "action": {
+              "const": "unlink"
+            },
+            "id": {
+              "type": "string",
+              "minLength": 32,
+              "maxLength": 36,
+              "format": "uuid"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "action",
+            "id",
+            "expected_version"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "partyline/permissions": {
+        "status": "read",
+        "import_client": "control",
+        "configure_client": "control",
+        "connect": "control",
+        "cancel": "control",
+        "refresh": "control",
+        "select": "control",
+        "disconnect": "control",
+        "detection_configure": "control",
+        "dismiss": "control",
+        "link": "control",
+        "unlink": "control"
+      },
+      "partyline/labels": {
+        "status": "Read calendar accounts, events, sign-in progress, and call suggestions",
+        "import_client": "Open the native file picker to import a Google Desktop OAuth client JSON; secrets never returned",
+        "configure_client": "Save Google Desktop OAuth client",
+        "connect": "Open Google account sign-in; optional account_id requires reconnecting that same account",
+        "cancel": "Cancel pending Google sign-in",
+        "refresh": "Refresh selected calendars",
+        "select": "Choose calendars for one Google account",
+        "disconnect": "Remove one Google account from PartyLine",
+        "detection_configure": "Enable or disable call suggestions",
+        "dismiss": "Dismiss a detected call until its microphone activity ends",
+        "link": "Attach a calendar event to a recording",
+        "unlink": "Remove the calendar link; keep meeting details"
       }
     }
   }

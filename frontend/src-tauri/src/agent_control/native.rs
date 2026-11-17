@@ -13,7 +13,7 @@ pub struct Native {
     pub app: AppHandle,
     pub levels: Mutex<Option<(Value, Instant)>>,
     pub view: Mutex<Value>,
-    pending: Mutex<HashMap<String, oneshot::Sender<bool>>>,
+    pending: Mutex<HashMap<String, oneshot::Sender<Result<Value, String>>>>,
 }
 
 impl Native {
@@ -26,9 +26,9 @@ impl Native {
         })
     }
 
-    pub fn ui_result(&self, id: &str, ok: bool) {
+    pub fn ui_result(&self, id: &str, ok: bool, result: Option<Value>, error: Option<String>) {
         if let Some(sender) = self.pending.lock().unwrap().remove(id) {
-            let _ = sender.send(ok);
+            let _ = sender.send(if ok { Ok(result.unwrap_or(json!({"ok":true}))) } else { Err(error.unwrap_or_else(|| "The window could not perform this action.".into())) });
         }
     }
 
@@ -51,8 +51,7 @@ impl Native {
         let result = tokio::time::timeout(Duration::from_secs(50), receiver).await;
         self.pending.lock().unwrap().remove(&id);
         match result {
-            Ok(Ok(true)) => Ok(json!({"ok":true})),
-            Ok(Ok(false)) => Err("The window could not perform this action. Check PartyLine and retry.".into()),
+            Ok(Ok(result)) => result,
             _ => Err("PartyLine's window did not acknowledge the action. Open the window and check its state before retrying.".into()),
         }
     }
@@ -122,12 +121,20 @@ impl Backend for Native {
         let action = arguments["action"].as_str().ok_or("Missing action.")?;
         let id = text(&arguments, "id");
         match (tool, action) {
+            ("partyline_calendar", "status" | "import_client" | "configure_client" | "connect" | "cancel" | "refresh" | "select" | "disconnect" | "detection_configure" | "dismiss") => {
+                crate::cloud::calendar::cloud_calendar_action(self.app.clone(),arguments).await
+            }
+            ("partyline_calendar", "link" | "unlink") => {
+                let m=crate::cloud::calendar::cloud_calendar_link(self.app.clone(),id,arguments["expected_version"].as_u64().ok_or("Missing version.")?,if action=="link"{Some(text(&arguments,"event_key"))}else{None},arguments["use_details"].as_bool().unwrap_or(false)).await?;
+                Ok(json!({"meeting":m}))
+            }
             ("partyline_status", "get") => {
                 let current = crate::cloud::cloud_current().await.map(|m| {
                     json!({
                         "id":m.id,"title":m.title,"status":m.status,"duration":m.duration,
                         "connection":m.connection,"errors":m.errors,"notes_status":m.notes_status,
                         "revision":m.revision,"notes_revision":m.notes_revision,
+                        "capture":m.capture,"recovery_needed":m.recovery_needed,"recovery":m.recovery,
                     })
                 });
                 let keys = crate::cloud::keys::cloud_key_status();
@@ -137,7 +144,7 @@ impl Backend for Native {
                     "connections":{"assemblyai":keys.assemblyai,"openai":keys.openai},
                     "capabilities":{"transcript_text_edit":true,"live_input_switch":false,
                         "meeting_delete":true,"recoverable_trash":true,"trim":true,"redaction":true,"playback":true,
-                        "live_participant_list_edit":false,"update_check":false},
+                        "live_participant_list_edit":true,"google_calendar":true,"meeting_detection":true,"update_check":false},
                     "permission_scope":"Cloud meetings in this macOS app. Agent access is saved until changed in PartyLine."}),
                 )
             }
@@ -186,6 +193,8 @@ impl Backend for Native {
                     "fresh":age_ms.is_some_and(|age| age <= 2000),
                     "connection":current.as_ref().map(|m| &m.connection),
                     "warnings":current.as_ref().map(|m| &m.errors),
+                    "capture":current.as_ref().map(|m| &m.capture),
+                    "recovery_needed":current.as_ref().map(|m| m.recovery_needed),
                     "active_microphone":null,
                     "active_microphone_known":false,
                     "note":"Levels measure received signal, not permission or transcript accuracy. The capture API does not report the active input name."}))
@@ -203,6 +212,12 @@ impl Backend for Native {
             ("partyline_meetings", "get") => {
                 Ok(json!(crate::cloud::cloud_get(self.app.clone(), id).await?))
             }
+            ("partyline_recovery", "status") => {
+                let m=crate::cloud::cloud_get(self.app.clone(),id).await?;
+                Ok(json!({"meeting_id":m.id,"recovery":m.recovery,"recovery_needed":m.recovery_needed,"edit_version":m.edit_version,"capture":m.capture}))
+            }
+            ("partyline_recovery", "start") => crate::cloud::recovery::cloud_recovery_start(self.app.clone(),id,text(&arguments,"channel"),arguments["expected_version"].as_u64().unwrap()).await,
+            ("partyline_recovery", "cancel") => crate::cloud::recovery::cloud_recovery_cancel(self.app.clone(),id).await,
             ("partyline_meetings", "library") => crate::cloud::operations::cloud_library(self.app.clone(),arguments["trash"].as_bool().unwrap_or(false),text(&arguments,"query")).await,
             ("partyline_meetings", "search") => crate::cloud::operations::cloud_search(self.app.clone(),text(&arguments,"query"),arguments["limit"].as_u64().unwrap_or(50) as usize).await,
             ("partyline_meetings", "update" | "edit_turn" | "trim" | "redact" | "unredact" | "trash" | "restore" | "undo") => {
@@ -223,8 +238,21 @@ impl Backend for Native {
             ("partyline_playback", "get") => Ok(json!({"playback":self.view.lock().unwrap().get("playback").cloned().unwrap_or(Value::Null)})),
             ("partyline_playback", "set") => { self.idle().await?; self.ui("playback",arguments).await },
             ("partyline_playback", "close") => self.ui("playback_close",json!({})).await,
+            ("partyline_audio", "setup_status") => Ok(json!(crate::cloud::setup::cloud_setup_status())),
+            ("partyline_audio", "setup_start") => { let mic=self.microphone(&arguments).await?; Ok(json!(crate::cloud::setup::cloud_setup_start(self.app.clone(),mic).await?)) },
+            ("partyline_audio", "setup_cancel") => Ok(json!(crate::cloud::setup::cloud_setup_cancel())),
+            ("partyline_workspace", "preferences") => Ok(json!(crate::cloud::preferences::cloud_preferences(self.app.clone()))),
+            ("partyline_workspace", "configure") => Ok(json!(crate::cloud::preferences::cloud_preferences_update(self.app.clone(),arguments["patch"].clone()).await?)),
             ("partyline_workspace", "get") => Ok(json!({"workspace":self.view.lock().unwrap().get("workspace").cloned().unwrap_or(Value::Null)})),
-            ("partyline_workspace", "set") => self.ui("workspace",arguments).await,
+            ("partyline_workspace", "set" | "outline" | "transcript") => self.ui("workspace",arguments).await,
+            ("partyline_workspace", "outline_state") => Ok(json!(crate::cloud::preferences::cloud_outline(self.app.clone(),id).await?)),
+            ("partyline_workspace", "outline_set") => {
+                // The window checks the requested meeting and node against its rendered outline.
+                let mut check = arguments.clone(); check["action"] = json!("outline_validate");
+                self.ui("workspace",check).await?;
+                let change = serde_json::from_value(arguments["change"].clone()).map_err(|_| "Invalid outline change.")?;
+                Ok(json!(crate::cloud::preferences::cloud_outline_update(self.app.clone(),id,change).await?))
+            },
             ("partyline_chat", "list") => crate::cloud::chat::cloud_chat_list(self.app.clone()).await,
             ("partyline_chat", "ask") => {
                 let mut result=crate::cloud::chat::cloud_chat_ask(self.app.clone(),text(&arguments,"question"),arguments["meeting_id"].as_str().map(String::from)).await?;
@@ -249,6 +277,7 @@ impl Backend for Native {
                     .collect();
                 let mut result = page(items, &arguments);
                 result["names"] = json!(m.names);
+                result["speaker_aliases"] = json!(m.speaker_aliases);
                 result["revision"] = json!(m.revision);
                 result["meeting_id"] = json!(m.id);
                 Ok(result)
@@ -311,17 +340,19 @@ impl Backend for Native {
                 let m = crate::cloud::cloud_get(self.app.clone(), id).await?;
                 let mut speakers = BTreeSet::new();
                 for turn in m.turns.values() {
-                    speakers.insert(turn.speaker.clone());
-                    speakers.extend(turn.words.iter().map(|word| word.speaker.clone()));
+                    speakers.insert(m.canonical_speaker(&turn.speaker).to_owned());
+                    speakers.extend(turn.words.iter().map(|word| m.canonical_speaker(&word.speaker).to_owned()));
                 }
                 let speakers: Vec<_> = speakers.into_iter().map(|speaker| json!({
                     "id":speaker,"display_name":m.display_name(&speaker),"confirmed_name":m.names.get(&speaker),
                     "can_rename":speaker != "me" && !speaker.ends_with(":PENDING") && !speaker.ends_with(":UNKNOWN"),
                 })).collect();
                 Ok(
-                    json!({"speakers":speakers,"participant_suggestions":m.participants,"revision":m.revision}),
+                    json!({"speakers":speakers,"participant_suggestions":m.participants,"revision":m.revision,"speaker_aliases":m.speaker_aliases,"speaker_edit_version":m.speaker_edit_version,"can_undo_merge":m.previous_aliases.is_some()}),
                 )
             }
+            ("partyline_speakers", "merge") => Ok(json!(crate::cloud::cloud_merge_speakers(self.app.clone(),id,arguments["sources"].as_array().unwrap().iter().map(|v|v.as_str().unwrap().to_string()).collect(),text(&arguments,"target"),arguments["expected_version"].as_u64().unwrap()).await?)),
+            ("partyline_speakers", "undo_merge") => Ok(json!(crate::cloud::cloud_undo_speaker_merge(self.app.clone(),id,arguments["expected_version"].as_u64().unwrap()).await?)),
             ("partyline_speakers", "rename") => {
                 crate::cloud::cloud_rename_speaker(
                     self.app.clone(),

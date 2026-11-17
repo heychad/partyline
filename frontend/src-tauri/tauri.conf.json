@@ -1,7 +1,7 @@
 {
     "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
     "productName": "PartyLine",
-    "version": "0.4.1",
+    "version": "0.4.5",
     "identifier": "com.heychad.partyline",
     "build": {
         "frontendDist": "../out",
@@ -111,7 +111,7 @@
         ],
         "macOS": {
             "entitlements": "entitlements.plist",
-            "signingIdentity": "-",
+            "signingIdentity": "Apple Development: heychad@gmail.com (9K7D75TL79)",
             "hardenedRuntime": true,
             "dmg": {
                 "background": "icons/dmg-background.png",

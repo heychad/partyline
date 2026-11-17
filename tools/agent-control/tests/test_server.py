@@ -28,7 +28,7 @@ def ready(transport=server.connect):
 class ProtocolTests(unittest.TestCase):
     def test_catalog_is_current_and_covers_every_cloud_command(self):
         self.assertEqual(catalog.TOOLS, json.loads(catalog.CATALOG.read_text()))
-        self.assertEqual(len(catalog.TOOLS), 13)
+        self.assertEqual(len(catalog.TOOLS), 15)
         # Actual native entry points must be visible in the adapter; no generic invoke bypass.
         import re
         root = catalog.ROOT / 'frontend/src-tauri/src'
@@ -46,7 +46,7 @@ class ProtocolTests(unittest.TestCase):
         result = bridge.handle(request('initialize', dict(protocolVersion='future-version')))
         self.assertEqual(result['result']['protocolVersion'], server.VERSIONS[0])
         self.assertIsNone(bridge.handle(dict(jsonrpc='2.0', method='notifications/initialized')))
-        self.assertEqual(len(bridge.handle(request('tools/list'))['result']['tools']), 13)
+        self.assertEqual(len(bridge.handle(request('tools/list'))['result']['tools']), 15)
         self.assertIn('error', bridge.handle(request('initialize', dict(protocolVersion=server.VERSIONS[0]))))
         self.assertIn('error', bridge.handle(request('tools/list', dict(cursor='unknown'))))
 
@@ -104,7 +104,7 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(result.stderr, '')
         responses = [json.loads(line) for line in result.stdout.splitlines()]
         self.assertEqual(len(responses), 2)
-        self.assertEqual(len(responses[1]['result']['tools']), 13)
+        self.assertEqual(len(responses[1]['result']['tools']), 15)
 
     def test_local_ui_commands_are_registered_and_permissioned(self):
         root = catalog.ROOT / 'frontend/src-tauri'

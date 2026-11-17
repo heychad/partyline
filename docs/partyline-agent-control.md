@@ -1,6 +1,6 @@
 # PartyLine agent control
 
-Thirteen MCP tools cover 61 actions in the cloud workspace and its native commands. They call the same recording, speaker, notes, export, and Keychain functions as the app. A small view bridge handles setup fields, history selection, Connections, banners, and transcript following.
+Fifteen MCP tools cover 87 actions in the cloud workspace and its native commands. They call the same recording, speaker, notes, export, and Keychain functions as the app. A small view bridge handles setup fields, history selection, Connections, banners, and transcript following.
 
 The implementation is in `frontend/src-tauri/src/agent_control/`, `frontend/src/components/agent-control/`, and `tools/agent-control/`. The macOS app and DMG rebuilt on November 14, 2026 include persistent access settings. The previous 33-action catalog has live acceptance coverage across the normal app and an isolated native key-test profile; the expanded library catalog has automated and local live coverage, including a completed AI-answer check on November 15. New installations start with agent access Off.
 
@@ -15,7 +15,7 @@ Inventory source: `CloudWorkspace.tsx`, `cloud/mod.rs`, `cloud/keys.rs`, `lib.rs
 | List microphones | `audio/list` | `get_audio_devices` |
 | Select the next microphone | `audio/select` or `recording/start.microphone` | Setup form; `cloud_start` |
 | Live microphone/Mac meters, elapsed time, warnings | `audio/diagnostics` | Existing `cloud-levels` events and `cloud_current` |
-| New meeting; title and participant suggestions | `meetings/new`, `meetings/prepare` or `recording/start` | Setup fields; `cloud_start` |
+| One-click recording; optional prepared title and participant suggestions | `meetings/new`, `meetings/prepare` or `recording/start` | Quick Start and sidebar start; `cloud_start` |
 | Start, pause, resume, stop | `recording/start`, `recording/pause`, `recording/resume`, `recording/stop` | `cloud_start`, `cloud_pause`, `cloud_stop` |
 | History and saved meeting selection | `meetings/list`, `meetings/get`, `meetings/open` | `cloud_list`, `cloud_get`; existing UI open handler |
 | Live/final transcript, word timings, revised speaker IDs | `meetings/transcript` | Current meeting snapshot and ordered turns |
@@ -31,7 +31,7 @@ Inventory source: `CloudWorkspace.tsx`, `cloud/mod.rs`, `cloud/keys.rs`, `lib.rs
 | Remove a saved key (native command, no current button) | `connections/remove` | `cloud_remove_key` |
 | See agent actions and outcomes | `status/activity` | Bounded activity log in the **Agents** control |
 | Search library and view Trash | `meetings/library`, `meetings/search`; `workspace/get`, `workspace/set` for visible filters | `cloud_library`, `cloud_search`; shared React filters |
-| Edit title, participants, transcript, and notes | `meetings/update`, `meetings/edit_turn`, `notes/edit` | `cloud_edit`; shared version-checked edit and atomic persistence |
+| Edit title and participants during recording; edit saved transcript and notes | `meetings/update`, `meetings/edit_turn`, `notes/edit` | `cloud_edit`; shared version-checked edit and atomic persistence |
 | Trim, redact, restore a redacted passage, undo | `meetings/trim`, `meetings/redact`, `meetings/unredact`, `meetings/undo` | `cloud_edit`; original files and revision history retained |
 | Move to Trash and restore | `meetings/trash`, `meetings/restore` | `cloud_edit`; recoverable deletion, no purge action |
 | Click transcript to play; pause, seek, source, speed, close | `playback/get`, `playback/set`, `playback/close` | Shared playback controller and `cloud_audio`; state includes loading/error/end |
@@ -41,11 +41,24 @@ Inventory source: `CloudWorkspace.tsx`, `cloud/mod.rs`, `cloud/keys.rs`, `lib.rs
 | Choose Drive folder and automatic backup | `backup/settings`, `backup/configure`, `backup/choose_folder` | `cloud_backup_settings`, `cloud_backup_configure`, `cloud_backup_choose_folder`; picker remains visible |
 | Start/retry backup, see progress/errors | `backup/start`, `backup/status` | `cloud_backup_start`, `cloud_backup_status`; async local copy, Drive uploads separately |
 | Inspect MCP setup and connect clients | `clients/status`, `clients/setup` | `cloud_client_status`, `cloud_client_setup`; preserves other client configuration |
+| Merge live or saved speaker identities; undo merge | `speakers/merge`, `speakers/undo_merge`; `speakers/list` returns aliases and speaker edit version | `cloud_merge_speakers`, `cloud_undo_speaker_merge`; shared validation and persisted aliases; original provider IDs retained |
+| Recover saved transcript; cancel/retry and read progress | `recovery/start`, `recovery/cancel`, `recovery/status` | `cloud_recovery_start`, `cloud_recovery_cancel`, `cloud_get`; control required for provider requests, read for progress |
+| Resize/show/hide panels, pin transcript, choose notes interval | `workspace/preferences`, `workspace/configure` | `cloud_preferences`, `cloud_preferences_update`; same validated persisted settings and events for UI/tools |
+| Check setup before a meeting; cancel or retry | `audio/setup_status`, `audio/setup_start`, `audio/setup_cancel` | `cloud_setup_status`, `cloud_setup_start`, `cloud_setup_cancel`; shared capture exclusion, progress/events, Keychain unlock, discarded audio samples |
+| Read the grouped transcript with paragraph boundaries, original turn IDs, and audio ranges | `workspace/transcript`; raw turns remain at `meetings/transcript` | Same `transcriptGroups`/`transcriptPage` functions rendered by `TranscriptPane` |
+| Read/collapse/expand the notes outline, including all nested nodes and future additions | `workspace/outline`, `workspace/outline_state`, `workspace/outline_set` | `cloud_outline`, `cloud_outline_update`; shared node validation, atomic per-meeting state, `cloud-outline` event |
+| Open View and speaker-management popovers | `workspace/get`, `workspace/set` with panel `view` or `speakers`; `speakers/rename`, `speakers/merge` perform edits | Shared controlled popovers and native speaker commands |
+| Google account status, selected calendars, upcoming events, sync/sign-in errors | `calendar/status` | `cloud_calendar_action`; tokens never returned; account-specific errors and selections |
+| Configure Desktop OAuth client; add/reconnect Google accounts; cancel pending sign-in | `calendar/import_client`, `calendar/configure_client`, `calendar/connect`, `calendar/cancel` | `cloud_calendar_action`; Keychain, system-browser PKCE/loopback OAuth, human Google consent |
+| Choose calendars, refresh, remove one account | `calendar/select`, `calendar/refresh`, `calendar/disconnect` | `cloud_calendar_action`; same persisted per-account selection, cache removal, events, and validation |
+| Enable/disable microphone-based call suggestions; dismiss a suggestion | `calendar/detection_configure`, `calendar/dismiss`; `calendar/status` reads evidence/errors | `cloud_calendar_action`; debounced Core Audio process activity, no audio captured by detector |
+| Attach/unlink an event during or after recording; optionally use title/invitees | `calendar/link`, `calendar/unlink` | `cloud_calendar_link`; shared version-checked calendar edit, no voice inference |
+| Open/close calendar panel; record from a detected-call prompt | `workspace/set` with panel `calendar` or `none`; `recording/start` | Shared window callbacks; ordinary recording command |
 | Grant/revoke agent access; saved level across restarts | Human-only **Agents** control; `status/get` reports the level | Main-window permission commands and private access settings; agents cannot grant access |
 
 Tool names have the `partyline_` prefix. For example, `notes/get` means `partyline_notes` with `{"action":"get","id":"…"}`. The machine-readable catalog is `frontend/src-tauri/src/agent_control/tools.json`; `catalog.py` generates it.
 
-Unsupported actions are explicit in `status/get`: changes to the live microphone or participant list and update checks. The cloud UI does not implement live input/list changes. Permanent deletion is intentionally absent; Trash is recoverable. The tray dispatches an update event, but the cloud root does not mount its listener. Legacy local-model screens and commands are outside this cloud API.
+Unsupported actions are explicit in `status/get`: changes to the live microphone and update checks. Live title and participant suggestions are editable; live audio-input changes remain unsupported. Permanent deletion is intentionally absent; Trash is recoverable. The tray dispatches an update event, but the cloud root does not mount its listener. Legacy local-model screens and commands are outside this cloud API.
 
 Participant suggestions never identify a speaker automatically. Rename a detected speaker only after confirmation; an empty name removes confirmation. Existing provider revisions and reconnect speaker IDs remain authoritative.
 
@@ -189,3 +202,84 @@ The MCP bridge is bundled with the app. Client setup installs a stable copy into
 Local evidence is in `target/partyline-library-live.json` and `target/partyline-library-preservation.json`. The repeatable manual helper is `tools/meeting-library/tests/live_library.py`; it requires the explicitly disposable fixture pointer in `target/partyline-library-fixture.json`. It never reads or prints API-key values. Real recordings were not used for these tests. All nine pre-existing meeting/audio files matched their pre-test hashes after validation. The verified app was installed at `/Applications/PartyLine.app`; its recordings, saved connections, and Control grant remained available.
 
 References: [Tauri asset URLs](https://v2.tauri.app/reference/javascript/api/namespacecore/#convertfilesrc), [Codex MCP setup](https://developers.openai.com/codex/mcp), and [Claude Desktop local MCP setup](https://modelcontextprotocol.io/docs/develop/connect-local-servers).
+
+## Recording reliability and workshop controls — November 17, 2026
+
+Version 0.4.2 removes the three-second local queue stop. The recorder owns a separate runtime and writes samples on arrival. It never waits on transcript, notes, Keychain, or UI publication. Streaming copies have a bounded queue; loss there sets `recovery_needed`, while the local WAV continues. Headers and disk data are checkpointed every two seconds. Diagnostics and meeting reads expose `capture`: durable seconds, per-channel seconds, live-copy loss, levels, arrival flags, and update time. Fatal device or disk failures remain possible and produce a visible interrupted state and a desktop notification when macOS permits it.
+
+Streaming reconnects with backoff up to 30 seconds and renews sessions before the provider's three-hour limit. A reconnect creates a new speaker namespace. Recording can start while provider connections are unavailable. Recovery is explicit and uses the selected original audio, including material excluded from sharing. It replaces that channel's transcript, retains a revision for undo, preserves audio originals, and requires notes review. Remote speaker names from a new transcription require confirmation. Progress, failure, cancellation, and retry are available through both UI and agent tools. Retry reuses saved provider IDs; if submission acknowledgement is lost before an ID is saved, inspect provider jobs before retrying.
+
+The notes interval is 30, 60, 120 (default), or 300 seconds; 0 means manual. Explicit refresh and final notes remain available. Outline collapse IDs and panel widths/visibility persist. Transcript pinning is distinct from Follow live. Chat is a docked panel. New live turns do not invalidate an answer about unchanged cited passages; changed, redacted, trimmed, or deleted cited content does.
+
+Validation evidence and remaining limits are recorded in [the recording reliability report](partyline-recording-reliability.md). A three-hour accelerated PCM test is not a three-hour hardware soak. Current microphone switching and device reconnection remain outside the supported live controls.
+
+### Stable macOS signing
+
+Local builds use the installed Apple Development identity instead of an ad-hoc signature. macOS still owns Keychain and audio grants. Approve the signed app with Always Allow during connection setup; repeated-launch checks must verify persistence. No agent permission or key-value API changes. Other developers must supply their own signing identity.
+
+## Live workspace — 0.4.3
+
+The compact View menu controls panel visibility and independent scrolling. Library, transcript/notes, and Ask dividers preview their size while dragging and save on release; arrow keys also resize them. Speaker management is a popover. Consecutive turns from the same confirmed speaker share a sticky heading. Presentation-only sentence grouping retains source turn IDs and audio ranges for playback, edits, and redaction. Follow live observes both content growth and pane resizing; upward scrolling pauses it until resumed.
+
+Outline state is stored per recording in `outline-state.json`. Collapse all also collapses newly added nodes; individual overrides survive updates and restart. Existing heading-collapse preferences seed the new state on upgrade. Heading and parent-item IDs tolerate punctuation, case changes, and unrelated reordering. A substantially renamed label receives a new ID and uses the current default. Notes generation is instructed to retain labels. A pre-update scroll anchor keeps the current section in view when content above it changes.
+
+Agents read grouped passages with `workspace/transcript`, visible nodes with `workspace/outline`, and persisted state with `workspace/outline_state`. `workspace/outline_set` uses the same validation, storage, and UI event as human controls. Visible outline operations require the recording to be open and loaded; invalid or stale node IDs return an error. `workspace/set` opens View or Speakers and awaits persisted panel changes. Schemas declare read/control permissions for all 75 actions across 14 tools.
+
+Connections and the new-meeting screen include an eight-second setup check. `audio/setup_start`, `setup_status`, and `setup_cancel` expose the same operation. It unlocks saved connections and opens both capture inputs, discards all samples, and makes no provider request. It rejects concurrent recording or another setup check. Cancellation during a blocking macOS approval takes effect after that prompt returns. Keychain remains the persistent credential store; successfully unlocked keys are reused only in process memory, with serialized access to avoid simultaneous prompts. macOS still controls approval; this cannot guarantee that macOS never prompts again after an update or permission change.
+
+Manual acceptance helper: `python3 tools/agent-control/tests/live_workspace.py exercise`, restart the idle app, then run the helper with `restart`. It requires the existing explicitly disposable fixture pointer, preserves workspace preferences, checks visible and persisted outline state, tests additions during refresh, rejects stale nodes, reads source-linked transcript paragraphs, and restores fixture notes. It does not start a paid transcription or edit real recordings. The evidence file is `target/partyline-043-acceptance.json`.
+
+### 0.4.3 validation
+
+Automated checks passed: 23 UI/controller/render tests, 19 Python bridge/inventory tests, 14 Rust permission/service tests, 18 meeting-library/model tests, three recording-resilience tests, and five native cloud tests. The production frontend build includes type checking. The transcript rendering test checks inline source fragments, keyboard playback, and disabled playback during capture; outline tests exercise real rendered parent controls and scroll-anchor restoration.
+
+Live native acceptance passed for the new outline reads/updates, persistence through notes edits and restart, new-node collapse defaults, stale-node rejection, grouped transcript source ranges, panel switching, and workspace preferences. A focus-restoration bug found by switching View directly to Speakers was fixed and the transition passed in both directions. Human Collapse all matched agent state; dragging the transcript divider saved its new width and the original width was restored. Sticky speaker labels were observed while scrolling the hour-long saved livestream. The Ask pane opens alongside the workspace.
+
+The setup check completed on first launch and again after a signed update with no new approval prompts: both inputs supplied samples, Mac audio had signal, and the microphone was silent. Cancellation completed without creating a recording. This is not a microphone speech test or a guarantee about future macOS prompts. Control access and the existing five-minute notes interval survived restart. Eight non-fixture recordings retained their audio/meeting file sizes and modification times throughout these tests. The app, installed copy, and DMG are checked for matching executable, metadata, signature resources, and bundled agent bridge/catalog.
+
+Limits: live-follow growth and refresh scroll anchoring have deterministic component/controller tests; a new long real-time recording was not made for this UI release. The three-hour test injects accelerated PCM with stalled transcription rather than running hardware for three hours. Existing unsupported behaviors listed above remain unsupported; this release does not claim a fresh end-to-end run of every historical action.
+
+
+## Record first — 0.4.4
+
+Both the welcome screen and sidebar start recording immediately, using the selected microphone plus Mac audio. A blank title gets the existing local date/time default. The setup form is replaced by one primary action and an input selector; connection and permission checks remain in Connections. Agent-prepared title and participant suggestions remain visible on the welcome screen and are used when starting there. Sidebar Start recording starts a fresh, unnamed session.
+
+Clicking the title opens the shared details editor during connecting, recording, or pause. `meetings/update` uses the same version check, input validation, persistence, and events. `workspace/set` with panel `details` opens that editor during capture, and `status/get` reports live participant editing supported. No voice identity is inferred from participants. Edits wait during finalization; destructive and audio edits still require an idle recording.
+
+Live metadata edits clear the whole-meeting Undo pointer: restoring a live snapshot later would discard subsequent transcript or capture state. Revisions are still retained for audit. Saved-meeting edits retain normal Undo. Live details can save while running notes are streaming and do not schedule an audio backup until the recording is finished.
+
+Calendar connection and cross-app meeting detection remain unimplemented. There is no calendar OAuth grant, event picker, meeting-app detector, or automatic recording trigger in this build. Proposed follow-up: optionally attach a calendar event after capture begins, then add a human-confirmed detected-meeting prompt. Invitee names remain suggestions.
+
+### 0.4.4 validation
+
+Automated checks passed: 24 UI/controller/render tests, 20 meeting-library/model tests, 14 Rust agent permission/service tests, and 19 Python bridge/inventory tests. Type checking, native compilation, the production bundle build, and inventory drift checks passed. New tests cover immediate start without metadata fields, live details during notes streaming, stale/invalid edits, finalization guards, and preventing Undo from restoring an obsolete live snapshot.
+
+An 18.79-second disposable recording started through the welcome button. Agent title/participant edits and a human title edit saved during capture; stale and blank-title edits were rejected. The recording completed without errors, with matching microphone and Mac-audio WAV durations. Mac audio carried signal; the microphone supplied samples but was silent, so this was not a speech test. No new permission prompts appeared in this test. Evidence: `target/partyline-044-acceptance.json`; repeatable helper: `tools/agent-control/tests/live_quick_start.py` with an explicitly identified test recording.
+
+The signed app is installed at `/Applications/PartyLine.app`. The installed executable, metadata, signature resources, and agent bridge/catalog match the app in `PartyLine_0.4.4_aarch64.dmg`. Control remains enabled. Eight pre-existing recordings retained their audio/meeting file sizes and modification times. Source changes remain uncommitted.
+
+## Google Calendar and meeting detection — 0.4.5
+
+PartyLine connects Google accounts directly with a dedicated Desktop app OAuth client, system-browser consent, PKCE, a random state value, and a loopback-only callback. Account IDs come from Google userinfo. Refresh tokens and the client secret stay in Keychain; neither results nor activity logs contain token/key values. Account email addresses and selected calendars are local settings. Events are cached in memory for the past 12 hours and next seven days, refreshed every five minutes and on request. Cancelled, declined, and all-day events are excluded. Sign-in, sync, per-account errors, and retry are visible through UI and tools.
+
+Each account has its own calendar selection. A failing account does not block other accounts; its stale event suggestions are cleared. Attaching an event stores a snapshot with the recording. The optional title/invitee replacement uses the same validated live edit path as manual details; it never names a voice. Unlinking retains the current meeting details. Removing an account removes local credentials and event suggestions but preserves links already attached to recordings. It does not revoke Google's app grant; use Google Account permissions for that.
+
+Detection is opt-in and checks microphone-using processes every five seconds on macOS 14.2+. Two observations are required before showing a prompt. Dismissal lasts until activity has been absent for six checks. PartyLine, music playback, and unrelated apps are excluded. Supported app families are Zoom, Teams, Slack, FaceTime, Webex, Chrome, Safari, Edge, and Firefox. Browser microphone activity is labeled as a possible call: no browser page, participant list, screenshot, or window title is inspected. A muted or listen-only call may not be detected. Capture never starts automatically; the prompt uses the existing Start recording action.
+
+Unsupported: direct calendar writes, calendar-event creation/deletion, browser-tab identification, automatic speaker identity, silent account consent, and automatic recording. Google Workspace administrators may restrict the app. Google OAuth testing mode can expire offline grants after seven days; publishing/verification is a separate Google setup decision.
+
+References: [Google desktop OAuth](https://developers.google.com/identity/protocols/oauth2/native-app), [Calendar read-only scopes](https://developers.google.com/workspace/calendar/api/auth), [Core Audio process input activity](https://developer.apple.com/documentation/coreaudio/kaudioprocesspropertyisrunninginput).
+
+### 0.4.5 validation
+
+Automated checks passed: 25 UI/controller/render tests, 19 Python bridge/inventory tests, 15 Rust agent permission/service tests, 24 meeting-library/model tests, six isolated calendar/OAuth tests, and five native calendar/OAuth/HTTP tests. The OAuth cases overlap between the isolated and native suites. Type checking, production compilation, and the 15-tool/87-action inventory check passed. Coverage includes callback state and PKCE, account separation, provider pagination/errors, event validation, live metadata edits, and permission enforcement.
+
+The signed 0.4.5 app is installed at `/Applications/PartyLine.app`. Its executable, metadata, signature resources, and packaged bridge/catalog match the built app and `PartyLine_0.4.5_aarch64.dmg`. Eight pre-existing recordings retained their audio/meeting file sizes and modification times. Control remains enabled.
+
+Native acceptance passed for opening Calendar through the agent, closing it through the UI and observing that state through the agent, rejecting invalid actions, running the process detector without an error, and restoring its original disabled setting. The agent-opened client JSON picker cancelled without changing the saved configuration. A dedicated Google Desktop client was created, Calendar API enabled, and its configuration saved through the app UI; the agent reports it configured without returning credentials.
+
+The human completed consent for Personal, Stimulus, CareAtlas, and MFC. All four accounts synced without errors, with 72 timed events across their selected primary calendars. Account IDs and event IDs remained distinct. Deselecting one account cleared only its event suggestions; restoring the selection restored its events. A disposable recording passed attachment with and without title/invitee replacement, stale-version rejection, and unlinking while retaining details. Its original title/participants were restored and WAV hashes remained unchanged. Agent attachment appeared in the UI; human Unlink was reflected in the agent's meeting read.
+
+After quitting the idle app and reopening `/Applications/PartyLine.app`, all four accounts, selected calendars, and Control access persisted. Calendar sync completed again with 72 events and no account errors. Meeting detection remains off until the human enables it.
+
+Evidence: `target/partyline-045-calendar-acceptance.json`, `target/partyline-045-connected-acceptance.json`, `target/partyline-045-bundle-verification.json`, and `target/partyline-045-preservation-before.json`. Repeat the pre-consent checks with `python3 tools/agent-control/tests/live_calendar.py` while idle. `live_calendar_connected.py` requires at least two authorized accounts and the explicitly disposable fixture; it restores calendar selections and fixture details after testing. No new long recording, token-expiry refresh, account-removal/re-consent, or all-app detection acceptance was run for this release. Source changes remain uncommitted.

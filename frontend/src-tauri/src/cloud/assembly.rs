@@ -10,10 +10,7 @@ use tokio_tungstenite::{
 };
 
 pub type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
-pub struct Frame {
-    pub pcm: Vec<u8>,
-    pub start: f64,
-}
+use super::archive::Frame;
 pub async fn open(key: &str, remote: bool, participants: &[String]) -> Result<Socket, String> {
     open_at(
         "wss://streaming.assemblyai.com/v3/ws",
@@ -128,9 +125,12 @@ pub async fn run(
     shared: Arc<Shared>,
     channel: &'static str,
     key: String,
-    mut socket: Socket,
     mut receiver: mpsc::Receiver<Frame>,
 ) {
+    let Some(mut socket) = reconnect(&shared, channel, &key, &receiver).await else {
+        return;
+    };
+    let mut connected_at = tokio::time::Instant::now();
     let mut generation = 0;
     let mut offset = 0.0;
     let mut first = true;
@@ -139,6 +139,7 @@ pub async fn run(
     shared.connection(channel, "Connected").await;
     loop {
         let failed = tokio::select! {
+            _=tokio::time::sleep_until(connected_at+Duration::from_secs(10_200))=>true,
             frame=async { if let Some(frame)=pending.take(){Some(frame)}else{receiver.recv().await} }=>match frame {
                 Some(frame)=>{
                     if first {offset=frame.start;expected=frame.start;first=false;}
@@ -161,7 +162,7 @@ pub async fn run(
             },
             message=socket.next()=>match message {
                 Some(Ok(Message::Text(text)))=>consume(&shared,channel,generation,offset,&text).await.unwrap_or(true),
-                Some(Ok(Message::Ping(data)))=>socket.send(Message::Pong(data)).await.is_err(),
+                Some(Ok(Message::Ping(data)))=>!matches!(timeout(Duration::from_secs(3),socket.send(Message::Pong(data))).await,Ok(Ok(_))),
                 Some(Ok(Message::Close(_)))|Some(Err(_))|None=>true,
                 _=>false,
             }
@@ -172,25 +173,13 @@ pub async fn run(
         let _ = timeout(Duration::from_secs(1), socket.close(None)).await;
         shared.warning(format!("{} transcription connection interrupted. Local audio continues; some live text may be missing.",if channel=="me"{"Microphone"}else{"Mac audio"})).await;
         shared.connection(channel, "Reconnecting").await;
-        // Bound retries and queue size. New sessions get separate speaker IDs: a new A is not necessarily the old A.
-        let mut replacement = None;
-        for delay in [1, 2, 4, 8] {
-            if receiver.is_closed() {
-                break;
-            }
-            tokio::select! {_ = shared.stop.cancelled()=>break,_ = tokio::time::sleep(Duration::from_secs(delay))=>{}}
-            let participants = shared.meeting.lock().await.participants.clone();
-            let result = tokio::select! {_ = shared.stop.cancelled()=>break,r=open(&key,channel=="remote",&participants)=>r};
-            if let Ok(ws) = result {
-                replacement = Some(ws);
-                break;
-            }
-        }
-        match replacement {
+        shared.meeting.lock().await.recovery_needed = true;
+        match reconnect(&shared, channel, &key, &receiver).await {
             Some(ws) => {
                 socket = ws;
                 generation += 1;
                 first = true;
+                connected_at = tokio::time::Instant::now();
                 shared.connection(channel, "Connected").await;
             }
             None => {
@@ -198,6 +187,36 @@ pub async fn run(
                     .connection(channel, "Offline — audio saved locally")
                     .await;
                 return;
+            }
+        }
+    }
+}
+
+async fn reconnect(
+    shared: &Shared,
+    channel: &str,
+    key: &str,
+    receiver: &mpsc::Receiver<Frame>,
+) -> Option<Socket> {
+    let mut delay = 0;
+    loop {
+        if receiver.is_closed() || shared.stop.is_cancelled() {
+            return None;
+        }
+        if delay > 0 {
+            tokio::select! {_ = shared.stop.cancelled()=>return None,_=tokio::time::sleep(Duration::from_secs(delay))=>{}}
+        }
+        let participants = shared.meeting.lock().await.participants.clone();
+        let result = tokio::select! {_ = shared.stop.cancelled()=>return None,r=open(key,channel=="remote",&participants)=>r};
+        match result {
+            Ok(ws) => return Some(ws),
+            Err(_) => {
+                shared.meeting.lock().await.recovery_needed = true;
+                shared.warning("Live transcription is offline. Local recording continues; reconnecting automatically.".into()).await;
+                shared
+                    .connection(channel, "Reconnecting — recording locally")
+                    .await;
+                delay = if delay == 0 { 1 } else { (delay * 2).min(30) };
             }
         }
     }

@@ -1,6 +1,8 @@
 //! Shared meeting editing, sharing, and audio logic. No UI, providers, or Keychain.
 #[path = "model.rs"]
 pub mod model;
+#[path = "calendar/domain.rs"]
+pub mod calendar_model;
 use model::{Meeting, TimeRange};
 use serde::{Deserialize, Serialize};
 use std::{fs, io::Write, path::Path};
@@ -8,6 +10,7 @@ use std::{fs, io::Write, path::Path};
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Edit {
+    Calendar { event: Option<calendar_model::Event>, use_details: bool },
     Details { title: String, participants: Vec<String> },
     Transcript { turn_id: String, text: String, start: Option<f64>, end: Option<f64> },
     Notes { text: String },
@@ -20,11 +23,35 @@ pub enum Edit {
 }
 
 pub fn idle(m: &Meeting) -> Result<(), String> {
+    if m.recovery.status=="running" {return Err("Wait for transcript recovery or cancel it first.".into());}
     if !["complete", "interrupted"].contains(&m.status.as_str()) {
         return Err("Finish the recording before editing or sharing its audio.".into());
     }
     if ["updating", "finalizing"].contains(&m.notes_status.as_str()) {
         return Err("Wait for notes to finish, then try again.".into());
+    }
+    Ok(())
+}
+
+pub fn replace_recovered_channel(m: &mut Meeting, channel: &str, generation: &str, response: &serde_json::Value) -> Result<(), String> {
+    if !["me", "remote"].contains(&channel) || response["status"] != "completed" { return Err("The recovered transcript is not complete.".into()); }
+    let words = response["words"].as_array().ok_or("Recovery returned no word alignment.")?;
+    let mut turns = Vec::new();
+    let mut group: Vec<model::Word> = Vec::new();
+    for w in words {
+        let start = w["start"].as_f64().ok_or("Missing recovered timestamp.")? / 1000.0;
+        let end = w["end"].as_f64().ok_or("Missing recovered timestamp.")? / 1000.0;
+        if !start.is_finite() || !end.is_finite() || start < 0.0 || end < start || end > m.duration + 1.0 { return Err("Recovered timestamps do not match this recording.".into()); }
+        let speaker = if channel == "me" { "me".to_owned() } else { format!("remote:recovered-{generation}:{}", w["speaker"].as_str().unwrap_or("UNKNOWN")) };
+        if group.first().is_some_and(|first| start - first.start > 15.0 || first.speaker != speaker) { turns.push(std::mem::take(&mut group)); }
+        group.push(model::Word { text: w["text"].as_str().ok_or("Missing recovered text.")?.into(), start, end, speaker });
+    }
+    if !group.is_empty() { turns.push(group); }
+    if turns.is_empty() && m.turns.values().any(|t|t.channel == channel) { return Err("Recovery returned no speech. The existing transcript was kept.".into()); }
+    m.turns.retain(|_,t|t.channel != channel);
+    for (i, words) in turns.into_iter().enumerate() {
+        let id = format!("{channel}:recovered-{generation}:{i}");
+        m.turns.insert(id.clone(), model::Turn { id, channel: channel.into(), order: i as u64, text: words.iter().map(|w|w.text.as_str()).collect::<Vec<_>>().join(" "), start: words[0].start, end: words.last().unwrap().end, speaker: words[0].speaker.clone(), final_text: true, words });
     }
     Ok(())
 }
@@ -36,11 +63,16 @@ fn range(m: &Meeting, start: f64, end: f64) -> Result<(), String> {
 }
 
 pub fn edited(m: &Meeting, expected: u64, edit: &Edit) -> Result<Meeting, String> {
-    idle(m)?;
+    let live_details = matches!(edit, Edit::Details { .. } | Edit::Calendar { .. }) && ["connecting", "recording", "paused"].contains(&m.status.as_str());
+    if !live_details { idle(m)?; }
     if m.edit_version != expected { return Err("This meeting changed. Reload it before saving your edit.".into()); }
     if m.deleted_at.is_some() && !matches!(edit, Edit::Restore) { return Err("Restore this meeting from Trash first.".into()); }
     let mut next = m.clone();
     match edit {
+        Edit::Calendar { event, use_details } => {
+            if let Some(event)=event { event.validate()?; if *use_details { next.title=event.title.clone(); next.participants=event.participants.clone(); } }
+            next.calendar_event=event.clone();
+        }
         Edit::Details { title, participants } => {
             if title.trim().is_empty() || title.contains('\0') || title.chars().count() > 200 || participants.len() > 100
                 || participants.iter().any(|p| p.trim().is_empty() || p.contains('\0') || p.chars().count() > 80) {
@@ -107,7 +139,9 @@ pub fn edited(m: &Meeting, expected: u64, edit: &Edit) -> Result<Meeting, String
     next.edit_version += 1;
     next.revision += 1;
     if matches!(edit, Edit::Notes { .. }) || (matches!(edit, Edit::Trash | Edit::Restore) && m.notes_revision == m.revision) { next.notes_revision = next.revision; }
-    next.undo_version = Some(m.edit_version);
+    // A whole-meeting undo of a live snapshot would erase later transcript/audio state.
+    // Live metadata remains versioned, but cannot restore that obsolete snapshot.
+    next.undo_version = if live_details { None } else { Some(m.edit_version) };
     Ok(next)
 }
 
@@ -240,3 +274,6 @@ pub fn validate_citations(answer:&str,count:usize)->Result<(),String>{
     }
     Ok(())
 }
+
+// New live turns do not invalidate an answer about unchanged cited passages.
+pub fn sources_current(meetings:&[Meeting],sources:&[Hit])->bool{sources.iter().all(|s|meetings.iter().any(|m|m.id==s.meeting_id && m.deleted_at.is_none() && m.title==s.title && m.turns.get(&s.turn_id).is_some_and(|t|m.turn_transcript(t)==s.text && m.display_name(&t.speaker)==s.speaker)))}

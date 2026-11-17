@@ -64,8 +64,8 @@ def check(root, generated):
 def runtime_change(path):
     p = Path(path)
     return ((path.startswith('frontend/src/') and p.suffix in {'.ts', '.tsx', '.js', '.jsx'})
-            or (path.startswith('frontend/src-tauri/src/') and p.suffix == '.rs')
-            or path.startswith(('frontend/src-tauri/permissions/', 'frontend/src-tauri/capabilities/'))
+            or (path.startswith('frontend/src-tauri/src/') and p.suffix in {'.rs', '.m', '.h'})
+            or path.startswith(('frontend/src-tauri/native/', 'frontend/src-tauri/permissions/', 'frontend/src-tauri/capabilities/'))
             or path in {'frontend/src-tauri/build.rs', 'frontend/src-tauri/tauri.conf.json',
                         'tools/agent-control/catalog.py', 'tools/agent-control/server.py'})
 

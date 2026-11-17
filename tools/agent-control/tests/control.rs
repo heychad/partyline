@@ -124,6 +124,7 @@ fn access_settings_are_private_and_reject_symlinks_without_changing_grants() {
 }
 
 fn sample(schema: &Value) -> Value {
+    if let Some(options)=schema["oneOf"].as_array(){return sample(&options[0]);}
     if let Some(value) = schema.get("const") {
         return value.clone();
     }
@@ -135,10 +136,10 @@ fn sample(schema: &Value) -> Value {
         "string" => json!("test"),
         "boolean" => json!(true),
         "integer" | "number" => schema.get("minimum").cloned().unwrap_or(json!(0)),
-        "array" => json!([]),
+        "array" => json!((0..schema["minItems"].as_u64().unwrap_or(0)).map(|_|sample(&schema["items"])).collect::<Vec<_>>()),
         "object" => {
             let mut value = json!({});
-            for name in schema["required"].as_array().unwrap() {
+            for name in schema["required"].as_array().into_iter().flatten() {
                 let name = name.as_str().unwrap();
                 value[name] = sample(&schema["properties"][name]);
             }
@@ -425,4 +426,49 @@ async fn mcp_stdio_reaches_the_actual_permissioned_service() {
     );
     assert_eq!(responses[2]["result"]["isError"], true);
     assert_eq!(backend.calls.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn recovery_merging_and_preferences_require_control_and_validate_inputs() {
+ let backend=Arc::new(Fake::default());let service=Service::new(backend.clone());service.set_access(Access::Read);
+ let id=uuid::Uuid::new_v4().to_string();
+ for req in [request("recovery",json!({"action":"start","id":id,"channel":"both","expected_version":0})),request("speakers",json!({"action":"merge","id":id,"sources":["remote:0:B"],"target":"remote:0:A","expected_version":0})),request("workspace",json!({"action":"configure","patch":{"notes_seconds":0}}))] {assert!(service.execute(req).await.is_err());}
+ assert!(backend.calls.lock().unwrap().is_empty());
+ assert!(service.execute(request("recovery",json!({"action":"status","id":id}))).await.is_ok());
+ service.set_access(Access::Control);
+ assert!(service.execute(request("workspace",json!({"action":"configure","patch":{"notes_seconds":3}}))).await.is_err());
+ assert!(service.execute(request("recovery",json!({"action":"start","id":id,"channel":"invalid","expected_version":0}))).await.is_err());
+ assert!(service.execute(request("workspace",json!({"action":"configure","patch":{"notes_seconds":120,"sidebar_visible":false}}))).await.is_ok());
+ *backend.response.lock().unwrap()=Some(Err("Recovery is already running.".into()));
+ assert!(service.execute(request("recovery",json!({"action":"start","id":id,"channel":"me","expected_version":0}))).await.is_err());
+ assert_eq!(service.activity().last().unwrap().outcome,"failed");
+}
+
+#[tokio::test]
+async fn workspace_outline_and_setup_preserve_permissions_and_error_results() {
+ let backend=Arc::new(Fake::default());let service=Service::new(backend.clone());service.set_access(Access::Read);
+ let id=uuid::Uuid::new_v4().to_string();
+ for req in [request("workspace",json!({"action":"outline_set","id":id,"change":{"operation":"collapse_all"}})),request("audio",json!({"action":"setup_start"})),request("audio",json!({"action":"setup_cancel"}))]{assert!(service.execute(req).await.is_err());}
+ assert!(backend.calls.lock().unwrap().is_empty());
+ for req in [request("workspace",json!({"action":"outline","id":id})),request("workspace",json!({"action":"outline_state","id":id})),request("workspace",json!({"action":"transcript","id":id,"limit":50})),request("audio",json!({"action":"setup_status"}))]{assert!(service.execute(req).await.is_ok());}
+ service.set_access(Access::Control);
+ assert!(service.execute(request("workspace",json!({"action":"outline_set","id":id,"change":{"operation":"set","node_id":"a","expanded":"yes"}}))).await.is_err());
+ assert!(service.execute(request("workspace",json!({"action":"outline_set","id":id,"change":{"operation":"set","node_id":"a","expanded":false}}))).await.is_ok());
+ assert!(service.execute(request("workspace",json!({"action":"transcript","id":id,"limit":101}))).await.is_err());
+ *backend.response.lock().unwrap()=Some(Err("Finish the recording before checking setup.".into()));
+ let failed=service.execute(request("audio",json!({"action":"setup_start"}))).await.unwrap_err();assert!(failed.contains("Finish the recording"));
+}
+
+#[tokio::test]
+async fn calendar_read_control_and_secret_audit_match_the_shared_service() {
+ let backend=Arc::new(Fake::default());let service=Service::new(backend.clone());
+ service.set_access(Access::Read);
+ assert!(service.execute(request("calendar",json!({"action":"status"}))).await.is_ok());
+ for args in [json!({"action":"connect"}),json!({"action":"refresh"}),json!({"action":"select","account_id":"one","calendar_ids":["primary"]}),json!({"action":"disconnect","account_id":"one"}),json!({"action":"detection_configure","enabled":true})] {assert!(service.execute(request("calendar",args)).await.is_err());}
+ assert_eq!(backend.calls.lock().unwrap().len(),1);
+ service.set_access(Access::Control);
+ assert!(service.execute(request("calendar",json!({"action":"configure_client","client_id":"fixture.apps.googleusercontent.com","client_secret":"NEVER-LOG-THIS"}))).await.is_ok());
+ let activity=serde_json::to_string(&service.activity()).unwrap();assert!(!activity.contains("NEVER-LOG-THIS"));assert!(!activity.contains("fixture.apps"));
+ assert!(service.execute(request("calendar",json!({"action":"select","account_id":"one","calendar_ids":"primary"}))).await.is_err());
+ assert!(service.execute(request("calendar",json!({"action":"detection_configure","enabled":"yes"}))).await.is_err());
 }

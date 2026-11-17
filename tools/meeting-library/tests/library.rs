@@ -95,3 +95,117 @@ fn retrieval_spans_calls_and_excludes_trashed_and_redacted_sources() {
  assert!(hits.iter().any(|h|h.meeting_id==second.id));
  assert!(hits.iter().all(|h|h.start==0.0 && h.end==3.0));
 }
+
+#[test]
+fn live_merges_apply_to_future_turns_preserve_names_and_undo() {
+ let mut m=meeting();m.status="recording".into();
+ for (i,label) in ["A","B","C"].iter().enumerate(){m.apply("remote",0,0.0,&serde_json::json!({"type":"Turn","turn_order":i,"transcript":"Hello","speaker_label":label,"end_of_turn":true,"words":[{"text":"Hello","start":0,"end":100,"speaker":label}]}));}
+ m.names.insert("remote:0:A".into(),"Chad".into());
+ m.merge_speakers(&["remote:0:B".into()],"remote:0:A",0).unwrap();
+ assert_eq!(m.display_name("remote:0:B"),"Chad");
+ m.apply("remote",0,1.0,&serde_json::json!({"type":"Turn","turn_order":5,"transcript":"Later","speaker_label":"B","end_of_turn":true}));
+ assert!(m.transcript().contains("Chad: Later"));
+ assert_eq!(m.turns["remote:0:5"].speaker,"remote:0:B");
+ assert!(m.merge_speakers(&["remote:0:C".into()],"remote:0:A",0).is_err());
+ m.merge_speakers(&["remote:0:A".into()],"me",1).unwrap();assert_eq!(m.display_name("remote:0:B"),"ME");
+ m.undo_merge(2).unwrap();assert_eq!(m.display_name("remote:0:B"),"Chad");assert!(m.undo_merge(3).is_err());
+ assert!(m.merge_speakers(&["me".into()],"remote:0:C",3).is_err());
+ let roundtrip:Meeting=serde_json::from_str(&serde_json::to_string(&m).unwrap()).unwrap();assert_eq!(roundtrip.display_name("remote:0:B"),"Chad");
+}
+#[test]
+fn recovery_changes_only_selected_channel_and_rejects_invalid_results() {
+ let mut m=meeting();let original=m.clone();
+ let response=serde_json::json!({"status":"completed","words":[{"text":"Recovered","start":1000,"end":1500,"speaker":"A"}]});
+ lib::replace_recovered_channel(&mut m,"remote","test",&response).unwrap();
+ assert_eq!(m.turns["me:0:0"].text,original.turns["me:0:0"].text);assert!(m.transcript().contains("Recovered speaker A: Recovered"));
+ let before=m.transcript();assert!(lib::replace_recovered_channel(&mut m,"remote","test",&serde_json::json!({"status":"completed","words":[{"text":"bad","start":-1,"end":100}]})).is_err());assert_eq!(m.transcript(),before);
+ assert!(lib::replace_recovered_channel(&mut m,"me","test",&serde_json::json!({"status":"completed","words":[]})).is_err());
+ m.recovery.status="running".into();assert!(lib::edited(&m,m.edit_version,&Edit::Trash).is_err());
+}
+#[test]
+fn preference_updates_validate_and_preserve_unrelated_settings() {
+ use lib::model::WorkspacePreferences;
+ let p=WorkspacePreferences::default();assert_eq!(p.notes_seconds,120);
+ let p=p.patched(serde_json::json!({"notes_seconds":0,"sidebar_width":350,"sidebar_visible":false})).unwrap();assert_eq!(p.notes_seconds,0);assert!(!p.sidebar_visible);assert!(p.notes_visible);
+ for patch in [serde_json::json!({"notes_seconds":1}),serde_json::json!({"transcript_percent":100}),serde_json::json!({"chat_width":100}),serde_json::json!({"api_key":"no"})] {assert!(p.patched(patch).is_err());}
+ let copy:WorkspacePreferences=serde_json::from_str(&serde_json::to_string(&p).unwrap()).unwrap();assert_eq!(copy.sidebar_width,350);
+}
+#[test]
+fn live_chat_citations_survive_new_turns_but_not_edits_redaction_or_trash() {
+ let mut m=meeting();let hits=lib::search(&[m.clone()],"Public",10);assert!(lib::sources_current(&[m.clone()],&hits));
+ m.apply("remote",0,3.0,&serde_json::json!({"type":"Turn","turn_order":0,"transcript":"New topic","speaker_label":"A","end_of_turn":true}));assert!(lib::sources_current(&[m.clone()],&hits));
+ let redacted=lib::edited(&m,0,&Edit::Redact{start:1.0,end:2.0}).unwrap();assert!(!lib::sources_current(&[redacted],&hits));
+ let trashed=lib::edited(&m,0,&Edit::Trash).unwrap();assert!(!lib::sources_current(&[trashed],&hits));
+ let edited=lib::edited(&m,0,&Edit::Transcript{turn_id:"me:0:0".into(),text:"Changed".into(),start:None,end:None}).unwrap();assert!(!lib::sources_current(&[edited],&hits));
+}
+
+#[test]
+fn outline_preferences_keep_defaults_for_new_nodes_and_round_trip() {
+    use partyline_meeting_library::model::{OutlineState,OutlineChange};
+    let original=OutlineState::default();
+    let collapsed=original.changed(OutlineChange::CollapseAll).unwrap();
+    assert!(collapsed.default_collapsed);
+    let changed=collapsed.changed(OutlineChange::Set{node_id:"section/plan/0".into(),expanded:true}).unwrap();
+    let folder=tempfile::tempdir().unwrap();
+    partyline_meeting_library::atomic_json(&folder.path().join("outline-state.json"),&changed).unwrap();
+    let loaded:OutlineState=serde_json::from_slice(&std::fs::read(folder.path().join("outline-state.json")).unwrap()).unwrap();
+    assert_eq!(loaded.overrides.get("section/plan/0"),Some(&true));assert!(loaded.default_collapsed);
+    let expanded=loaded.changed(OutlineChange::ExpandAll).unwrap();assert!(!expanded.default_collapsed);assert!(expanded.overrides.is_empty());
+    assert!(original.changed(OutlineChange::Set{node_id:"".into(),expanded:false}).is_err());
+    assert!(serde_json::from_value::<OutlineChange>(serde_json::json!({"operation":"set","node_id":"x","expanded":"false"})).is_err());
+}
+
+#[test]
+fn legacy_collapsed_headings_keep_their_state_after_workspace_upgrade() {
+    use lib::model::{OutlineState, OutlineChange};
+    let state=OutlineState::from_legacy(&["root/Plan!/0".into(),"root/plan/0/Owners/0".into()]);
+    assert_eq!(state.overrides["section/plan/0"],false);
+    assert_eq!(state.overrides["section/owners/0"],false);
+    let reset=state.changed(OutlineChange::ExpandAll).unwrap();
+    assert!(reset.overrides.is_empty());
+}
+
+#[test]
+fn live_details_keep_capture_and_streamed_content_and_cannot_undo_into_an_old_recording_snapshot() {
+    let dir=tempfile::tempdir().unwrap();
+    for status in ["connecting","recording","paused"] {
+        let mut current=meeting();current.status=status.into();current.notes_status="updating".into();current.notes_draft="Notes in progress".into();
+        let next=lib::save_edit(dir.path(),&current,0,&Edit::Details{title:"Workshop".into(),participants:vec!["Avery".into()]}).unwrap();
+        assert_eq!(next.title,"Workshop");assert_eq!(next.participants,vec!["Avery"]);
+        assert_eq!(next.status,status);assert_eq!(next.notes_status,"updating");assert_eq!(next.notes_draft,"Notes in progress");
+        assert_eq!(next.transcript(),current.transcript());assert_eq!(next.duration,current.duration);
+        assert_eq!(next.undo_version,None);assert_eq!(next.edit_version,1);
+        let saved:Meeting=serde_json::from_slice(&fs::read(dir.path().join("meeting.json")).unwrap()).unwrap();assert_eq!(saved.title,"Workshop");
+        let mut finished=next;finished.status="complete".into();finished.notes_status="idle".into();finished.duration=30.0;
+        finished.apply("remote",0,20.0,&serde_json::json!({"type":"Turn","turn_order":1,"transcript":"Later speech must survive","speaker_label":"A","end_of_turn":true}));
+        assert!(lib::save_edit(dir.path(),&finished,1,&Edit::Undo).is_err());
+        let amended=lib::save_edit(dir.path(),&finished,1,&Edit::Details{title:"Workshop finished".into(),participants:vec![]}).unwrap();
+        let undone=lib::save_edit(dir.path(),&amended,2,&Edit::Undo).unwrap();
+        assert_eq!(undone.status,"complete");assert_eq!(undone.duration,30.0);assert_eq!(undone.transcript(),finished.transcript());
+    }
+}
+
+#[test]
+fn live_details_enforce_the_same_versions_validation_and_destructive_edit_guards() {
+    let mut active=meeting();active.status="recording".into();
+    let valid=Edit::Details{title:"New title".into(),participants:vec!["Avery".into()]};
+    assert!(lib::edited(&active,1,&valid).is_err());
+    assert!(lib::edited(&active,0,&Edit::Details{title:" ".into(),participants:vec![]}).is_err());
+    assert!(lib::edited(&active,0,&Edit::Details{title:"Title".into(),participants:vec![" ".into()]}).is_err());
+    for edit in [Edit::Trash,Edit::Trim{start:0.0,end:1.0},Edit::Redact{start:0.0,end:1.0},Edit::Notes{text:"Replace".into()}] {assert!(lib::edited(&active,0,&edit).is_err());}
+    assert_eq!(active.title,"Original");assert_eq!(active.edit_version,0);
+    active.status="finishing".into();assert!(lib::edited(&active,0,&valid).is_err());
+}
+
+#[test]
+fn calendar_links_are_live_versioned_and_never_infer_speaker_identity() {
+ let dir=tempfile::tempdir().unwrap();let mut m=meeting();m.status="recording".into();m.notes_status="updating".into();m.notes_draft="Streaming".into();
+ let event=lib::calendar_model::event("account-a","primary",&serde_json::json!({"id":"event","summary":"Calendar title","start":{"dateTime":"2026-11-17T15:00:00-05:00"},"end":{"dateTime":"2026-11-17T16:00:00-05:00"},"attendees":[{"displayName":"Avery"}]})).unwrap();
+ let linked=lib::save_edit(dir.path(),&m,0,&Edit::Calendar{event:Some(event.clone()),use_details:false}).unwrap();
+ assert_eq!(linked.title,m.title);assert_eq!(linked.participants,m.participants);assert_eq!(linked.calendar_event,Some(event.clone()));assert_eq!(linked.undo_version,None);assert_eq!(linked.notes_draft,m.notes_draft);
+ assert!(lib::edited(&linked,0,&Edit::Calendar{event:None,use_details:false}).is_err());
+ let details=lib::save_edit(dir.path(),&linked,1,&Edit::Calendar{event:Some(event),use_details:true}).unwrap();assert_eq!(details.title,"Calendar title");assert_eq!(details.participants,vec!["Avery"]);assert_eq!(details.names,m.names);assert_eq!(details.turns.len(),m.turns.len());assert_eq!(details.status,"recording");
+ let cleared=lib::save_edit(dir.path(),&details,2,&Edit::Calendar{event:None,use_details:false}).unwrap();assert!(cleared.calendar_event.is_none());assert_eq!(cleared.title,details.title);assert_eq!(cleared.participants,details.participants);
+ let disk:Meeting=serde_json::from_slice(&fs::read(dir.path().join("meeting.json")).unwrap()).unwrap();assert_eq!(disk.edit_version,3);assert!(disk.calendar_event.is_none());
+ let mut finishing=details;finishing.status="finishing".into();assert!(lib::edited(&finishing,2,&Edit::Calendar{event:None,use_details:false}).is_err());
+}

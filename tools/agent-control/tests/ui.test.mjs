@@ -75,3 +75,13 @@ test('playback uses the shared controller callback and is denied during capture'
   await applyAgentUiRequest(request('workspace',{panel:'settings',trash:true}),handlers,async()=>null);
   assert.deepEqual(calls,[['playback',{id:'saved',position:12,speed:2,playing:true}],['playback_close'],['workspace',{panel:'settings',trash:true}]]);
 });
+
+test('agent outline callbacks return the shared result and await persistence; failures keep their cause', async()=>{
+ const {handlers}=fixture();let finish;
+ handlers.workspace=()=>new Promise(resolve=>finish=resolve);
+ let settled=false;const task=applyAgentUiRequest(request('workspace',{action:'outline'}),handlers,async()=>null).then(value=>{settled=true;return value});
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(settled,false);
+ finish({nodes:[{id:'section/plan/0',expanded:false}]});assert.deepEqual(await task,{nodes:[{id:'section/plan/0',expanded:false}]});
+ handlers.workspace=async()=>{throw new Error('Outline section changed. Read the outline and retry.')};
+ await assert.rejects(applyAgentUiRequest(request('workspace'),handlers,async()=>null),/section changed/);
+});

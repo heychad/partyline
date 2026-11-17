@@ -25,7 +25,7 @@ pub async fn cloud_chat_list(app:AppHandle)->Result<Value,String>{
         if entry.path().extension().and_then(|x|x.to_str())!=Some("json"){continue;}
         if let Ok(data)=std::fs::read(entry.path()){if let Ok(mut reply)=serde_json::from_slice::<Reply>(&data){
             if reply.status=="running" && !running().lock().unwrap().contains_key(&reply.id){reply.status="interrupted".into();reply.error=Some("The app closed during this answer. Ask again to retry.".into());}
-            let stale=reply.versions.iter().any(|(id,version)|!meetings.iter().any(|m|&m.id==id && m.revision==*version && m.deleted_at.is_none()));
+            let stale=!library::sources_current(&meetings,&reply.sources);
             if stale {reply.status="outdated".into();reply.answer.clear();reply.sources.clear();reply.error=Some("Source recordings changed. Ask again for an answer using the current edits.".into());}
             replies.push(reply);
         }}

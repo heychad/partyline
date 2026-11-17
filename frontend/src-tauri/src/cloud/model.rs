@@ -27,8 +27,41 @@ pub struct TimeRange {
     pub start: f64,
     pub end: f64,
 }
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct CaptureHealth {
+    pub recording: bool,
+    pub durable_seconds: f64,
+    pub seconds: [f64; 2],
+    pub live_skipped_seconds: [f64; 2],
+    pub levels: [f32; 2],
+    pub received: [bool; 2],
+    pub silent: [bool; 2],
+    pub updated_at: String,
+}
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct Recovery {
+    pub status: String,
+    pub phase: String,
+    pub channel: String,
+    pub error: Option<String>,
+    pub progress: u32,
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Meeting {
+    #[serde(default)]
+    pub calendar_event: Option<super::calendar_model::Event>,
+    #[serde(default)]
+    pub speaker_aliases: BTreeMap<String,String>,
+    #[serde(default)]
+    pub previous_aliases: Option<BTreeMap<String,String>>,
+    #[serde(default)]
+    pub speaker_edit_version: u64,
+    #[serde(default)]
+    pub recovery: Recovery,
+    #[serde(default)]
+    pub capture: CaptureHealth,
+    #[serde(default)]
+    pub recovery_needed: bool,
     pub id: String,
     pub title: String,
     pub created_at: String,
@@ -72,6 +105,11 @@ pub struct Meeting {
 impl Meeting {
     pub fn new(title: String, participants: Vec<String>) -> Self {
         Self {
+            calendar_event: None,
+            speaker_aliases: BTreeMap::new(),previous_aliases: None,speaker_edit_version: 0,
+            recovery: Recovery::default(),
+            capture: CaptureHealth::default(),
+            recovery_needed: false,
             id: uuid::Uuid::new_v4().to_string(),
             title,
             created_at: chrono::Utc::now().to_rfc3339(),
@@ -99,6 +137,7 @@ impl Meeting {
         }
     }
     pub fn display_name(&self, speaker: &str) -> String {
+        let speaker = self.canonical_speaker(speaker);
         self.names.get(speaker).cloned().unwrap_or_else(|| {
             if speaker == "me" {
                 "ME".into()
@@ -106,6 +145,7 @@ impl Meeting {
                 "Identifying speaker".into()
             } else {
                 let parts: Vec<_> = speaker.split(':').collect();
+                if parts.len() == 3 && parts[1].starts_with("recovered-") { return format!("Recovered speaker {}",parts[2]); }
                 if parts.len() == 3 && parts[1] != "0" {
                     format!(
                         "Speaker {} · connection {}",
@@ -117,6 +157,23 @@ impl Meeting {
                 }
             }
         })
+    }
+    pub fn canonical_speaker<'a>(&'a self,speaker:&'a str)->&'a str {self.speaker_aliases.get(speaker).map(String::as_str).unwrap_or(speaker)}
+    pub fn merge_speakers(&mut self,sources:&[String],target:&str,expected:u64)->Result<(),String>{
+        if self.speaker_edit_version!=expected {return Err("Speaker assignments changed. Reload before merging.".into());}
+        if self.deleted_at.is_some() || self.recovery.status=="running" {return Err("Restore the recording or wait for recovery before merging.".into());}
+        let mut known=std::collections::BTreeSet::from(["me".to_owned()]);
+        for t in self.turns.values(){known.insert(self.canonical_speaker(&t.speaker).to_owned());for w in &t.words {known.insert(self.canonical_speaker(&w.speaker).to_owned());}}
+        if sources.is_empty() || sources.len()>100 || !known.contains(target) || sources.iter().any(|s|s=="me"||s==target||!known.contains(s)||s.ends_with(":PENDING")||s.ends_with(":UNKNOWN")) || target.ends_with(":PENDING") || target.ends_with(":UNKNOWN") {return Err("Choose distinct identified speakers and a destination speaker. ME can only be the destination.".into());}
+        self.previous_aliases=Some(self.speaker_aliases.clone());
+        for value in self.speaker_aliases.values_mut(){if sources.contains(value){*value=target.into();}}
+        for source in sources {self.speaker_aliases.insert(source.clone(),target.into());}
+        self.speaker_edit_version+=1;self.revision+=1;self.speaker_revision+=1;self.notes_need_review=true;Ok(())
+    }
+    pub fn undo_merge(&mut self,expected:u64)->Result<(),String>{
+        if self.speaker_edit_version!=expected || self.deleted_at.is_some() || self.recovery.status=="running" {return Err("Speaker assignments changed or recovery is running. Reload before undoing.".into());}
+        self.speaker_aliases=self.previous_aliases.take().ok_or("There is no speaker merge to undo.")?;
+        self.speaker_edit_version+=1;self.revision+=1;self.speaker_revision+=1;self.notes_need_review=true;Ok(())
     }
     pub fn ordered_turns(&self) -> Vec<&Turn> {
         let mut turns: Vec<_> = self.turns.values().collect();
@@ -138,9 +195,9 @@ impl Meeting {
                 if !text.is_empty(){lines.push(format!("[{}] {}: {}",stamp(start),self.display_name(&speaker),text));text.clear();}
                 speaker.clear();continue;
             }
-            if word.speaker!=speaker {
+            if self.canonical_speaker(&word.speaker)!=speaker {
                 if !text.is_empty(){lines.push(format!("[{}] {}: {}",stamp(start),self.display_name(&speaker),text));text.clear();}
-                speaker=word.speaker.clone();start=word.start;
+                speaker=self.canonical_speaker(&word.speaker).to_owned();start=word.start;
             }
             if !text.is_empty(){text.push(' ');}text.push_str(&word.text);
         }
@@ -276,5 +333,63 @@ mod tests {
         assert_eq!(m.turns.len(), 3);
         assert_eq!(m.turns["me:0:0"].speaker, "me");
         assert_ne!(m.turns["remote:0:0"].speaker, m.turns["remote:1:0"].speaker);
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default,deny_unknown_fields)]
+pub struct WorkspacePreferences {
+    pub notes_seconds:u64,pub sidebar_width:u32,pub transcript_percent:u32,pub chat_width:u32,
+    pub sidebar_visible:bool,pub transcript_visible:bool,pub notes_visible:bool,pub chat_visible:bool,pub pin_transcript:bool,
+    pub collapsed_notes:Vec<String>,
+}
+impl Default for WorkspacePreferences {fn default()->Self{Self{notes_seconds:120,sidebar_width:225,transcript_percent:50,chat_width:360,sidebar_visible:true,transcript_visible:true,notes_visible:true,chat_visible:false,pin_transcript:true,collapsed_notes:vec![]}}}
+impl WorkspacePreferences {
+    pub fn validate(&self)->Result<(),String>{
+        if ![0,30,60,120,300].contains(&self.notes_seconds) || !(150..=400).contains(&self.sidebar_width) || !(20..=80).contains(&self.transcript_percent) || !(280..=700).contains(&self.chat_width) || self.collapsed_notes.len()>500 || self.collapsed_notes.iter().any(|s|s.len()>500) {return Err("Choose valid panel sizes and a supported notes refresh interval.".into());}Ok(())
+    }
+    pub fn patched(&self,patch:Value)->Result<Self,String>{let object=patch.as_object().ok_or("Settings must be an object.")?;let mut current=serde_json::to_value(self).map_err(|_|"Invalid settings.")?;for (k,v) in object {current[k]=v.clone();}let next:Self=serde_json::from_value(current).map_err(|_|"Unknown or invalid setting.")?;next.validate()?;Ok(next)}
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct OutlineState {
+    pub default_collapsed: bool,
+    // Values are expanded states. The default also applies to newly added nodes.
+    pub overrides: std::collections::BTreeMap<String, bool>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag="operation", rename_all="snake_case", deny_unknown_fields)]
+pub enum OutlineChange {
+    CollapseAll,
+    ExpandAll,
+    Set { node_id: String, expanded: bool },
+}
+impl OutlineState {
+    pub fn from_legacy(ids: &[String]) -> Self {
+        let mut state = Self::default();
+        for id in ids {
+            let parts: Vec<_> = id.rsplit('/').take(2).collect();
+            if parts.len() != 2 || parts[0].parse::<usize>().is_err() { continue; }
+            let label: String = parts[1].to_lowercase().chars().filter(|c| c.is_alphanumeric() || c.is_whitespace()).collect();
+            let label = label.split_whitespace().collect::<Vec<_>>().join(" ");
+            state.overrides.insert(format!("section/{}/{}", label, parts[0]), false);
+        }
+        state
+    }
+
+    pub fn changed(&self, change: OutlineChange) -> Result<Self, String> {
+        let mut next = self.clone();
+        match change {
+            OutlineChange::CollapseAll => { next.default_collapsed = true; next.overrides.clear(); }
+            OutlineChange::ExpandAll => { next.default_collapsed = false; next.overrides.clear(); }
+            OutlineChange::Set { node_id, expanded } => {
+                if node_id.is_empty() || node_id.len() > 500 { return Err("Invalid outline section.".into()); }
+                if expanded == !next.default_collapsed { next.overrides.remove(&node_id); }
+                else { next.overrides.insert(node_id, expanded); }
+                if next.overrides.len() > 500 { return Err("Too many outline overrides. Use Expand all or Collapse all to reset them.".into()); }
+            }
+        }
+        Ok(next)
     }
 }

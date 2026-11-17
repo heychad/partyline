@@ -36,7 +36,7 @@ def tool(name, description, actions):
         inputSchema=dict(type='object', oneOf=[a['schema'] for a in actions]),
         annotations=dict(readOnlyHint=all(a['permission'] == 'read' for a in actions),
                          destructiveHint=any(a['permission'] == 'control' for a in actions),
-                         idempotentHint=False, openWorldHint=name in ('recording', 'notes', 'connections', 'chat', 'backup')),
+                         idempotentHint=False, openWorldHint=name in ('recording', 'notes', 'connections', 'chat', 'backup', 'recovery', 'calendar')),
         _meta={'partyline/permissions': {a['name']: a['permission'] for a in actions},
                'partyline/labels': {a['name']: a['label'] for a in actions}})
 
@@ -49,17 +49,20 @@ TOOLS = [
         action('hide', 'control', 'Hide PartyLine'),
         action('quit', 'control', 'Quit PartyLine', {'expected_meeting_id': ID}),
     ]),
-    tool('audio', 'List inputs, inspect timestamped live audio levels and connection warnings, or select the next microphone in the setup form. Diagnostics do not start capture. Device changes during recording are unsupported.', [
+    tool('audio', 'List inputs, inspect timestamped live audio levels and connection warnings, or select the next microphone in the setup form. Diagnostics include durable audio seconds, per-channel live-copy losses, and recovery state. Diagnostics do not start capture. Device changes during recording are unsupported.', [
         action('list', 'read', 'List microphones'),
+        action('setup_status', 'read', 'Read setup progress, signal observations, and errors'),
+        action('setup_start', 'control', 'Unlock saved connections and check both audio inputs for eight seconds; no audio saved or uploaded. Unavailable during recording.', {'microphone': MIC}),
+        action('setup_cancel', 'control', 'Cancel the audio setup check; macOS approval may still need to be dismissed'),
         action('diagnostics', 'read', 'Read audio diagnostics'),
         action('select', 'control', 'Select next microphone', {'microphone': MIC}, ['microphone']),
     ]),
-    tool('meetings', 'Read cloud history, meeting state, or paginated transcript turns. Open a saved meeting, prepare the next meeting, control transcript following, or dismiss a banner. Saved recordings support edits, reversible Trash, trim, redaction, and undo. Every edit requires the current edit_version. Trims and redactions affect sharing; originals remain recoverable. Live participant-list edits are unsupported.', [
+    tool('meetings', 'Read cloud history, meeting state, or paginated transcript turns. Open a saved meeting, prepare the next meeting, control transcript following, or dismiss a banner. Saved recordings support edits, reversible Trash, trim, redaction, and undo. Every edit requires the current edit_version. Trims and redactions affect sharing; originals remain recoverable. Title and participant suggestions can be edited during recording; suggestions never assign voices.', [
         action('list', 'read', 'Read meeting history', {'offset': OFFSET, 'limit': LIMIT}),
         action('get', 'read', 'Read meeting', {'id': ID}, ['id']),
         action('library', 'read', 'Browse recordings and Trash', {'trash': BOOL, 'query': string(500)}),
         action('search', 'read', 'Search transcripts', {'query': string(500), 'limit': dict(type='integer', minimum=1, maximum=200)}, ['query']),
-        action('update', 'control', 'Edit meeting details', {'id': ID, 'expected_version': VERSION, 'title': string(200,1), 'participants': PEOPLE}, ['id','expected_version','title','participants']),
+        action('update', 'control', 'Edit title and participants, including during recording', {'id': ID, 'expected_version': VERSION, 'title': string(200,1), 'participants': PEOPLE}, ['id','expected_version','title','participants']),
         action('edit_turn', 'control', 'Edit transcript turn', {'id': ID, 'expected_version': VERSION, 'turn_id': string(160,1), 'text': string(16000,1), 'start': TIME, 'end': TIME}, ['id','expected_version','turn_id','text']),
         *[action(name, 'control', label, {'id': ID, 'expected_version': VERSION, 'start': TIME, 'end': TIME}, ['id','expected_version','start','end']) for name,label in [('trim','Trim recording'),('redact','Redact recording passage')]],
         action('unredact', 'control', 'Restore redacted passage', {'id': ID, 'expected_version': VERSION, 'redaction_id': ID}, ['id','expected_version','redaction_id']),
@@ -79,7 +82,14 @@ TOOLS = [
     ]),
     tool('speakers', 'Read participant suggestions and detected speaker IDs, or confirm a name. An empty name clears confirmation. ME and unidentified speakers cannot be renamed. Suggestions never assign identities automatically; confirmation updates transcript labels and invalidates notes.', [
         action('list', 'read', 'Read speakers', {'id': ID}, ['id']),
+        action('merge', 'control', 'Merge speaker identities', {'id':ID,'sources':dict(type='array',minItems=1,maxItems=100,items=string(160,1)),'target':string(160,1),'expected_version':VERSION}, ['id','sources','target','expected_version']),
+        action('undo_merge', 'control', 'Undo speaker merge', {'id':ID,'expected_version':VERSION}, ['id','expected_version']),
         action('rename', 'control', 'Confirm speaker name', {'id': ID, 'speaker': string(160, 1), 'name': string(80)}, ['id', 'speaker', 'name']),
+    ]),
+    tool('recovery', 'Reprocess a saved audio channel with AssemblyAI. Originals and the previous transcript are preserved; undo restores the previous transcript. The selected channel is replaced, recovered remote speaker identities need confirmation, and notes need refresh. Retry resumes saved provider jobs. Cancellation stops local work; submitted provider jobs may still finish and be billed.', [
+        action('status', 'read', 'Read recovery status', {'id': ID}, ['id']),
+        action('start', 'control', 'Recover saved transcript', {'id': ID, 'channel': CHANNEL, 'expected_version': VERSION}, ['id','channel','expected_version']),
+        action('cancel', 'control', 'Cancel transcript recovery', {'id': ID}, ['id']),
     ]),
     tool('notes', 'Read saved and streaming notes with their revisions, or request a refresh. Refresh uses OpenAI and returns when queued; poll notes/get for completion. Stop requests final notes through the recording lifecycle.', [
         action('get', 'read', 'Read notes', {'id': ID}, ['id']),
@@ -100,7 +110,18 @@ TOOLS = [
     ]),
     tool('workspace', 'Read or change the visible library filters and panels. Editing values use the meeting and notes tools; the human and agent share their validation.', [
         action('get', 'read', 'Read workspace state'),
-        action('set', 'control', 'Change workspace view', {'query': string(500), 'trash': BOOL, 'panel': dict(enum=['none','settings','chat','share','details','notes','trim','redact','transcript']), 'turn_id': string(160,1)}),
+        action('transcript', 'read', 'Read grouped transcript paragraphs with source turn IDs and audio ranges', {'id': ID, 'offset': OFFSET, 'limit': dict(type='integer',minimum=1,maximum=100,default=50)}, ['id']),
+        action('outline', 'read', 'Read the visible outline nodes and expansion states', {'id': ID}, ['id']),
+        action('outline_state', 'read', 'Read saved per-recording outline state', {'id': ID}, ['id']),
+        action('outline_set', 'control', 'Expand or collapse notes using the same persistent controls', {'id': ID, 'change': dict(oneOf=[
+            dict(type='object',additionalProperties=False,properties={'operation':dict(enum=['collapse_all','expand_all'])},required=['operation']),
+            dict(type='object',additionalProperties=False,properties={'operation':dict(const='set'),'node_id':string(500,1),'expanded':BOOL},required=['operation','node_id','expanded'])
+        ])}, ['id','change']),
+        action('preferences', 'read', 'Read workspace preferences'),
+        action('configure', 'control', 'Change workspace preferences', {'patch': dict(type='object', additionalProperties=False, properties={
+            'notes_seconds': dict(enum=[0,30,60,120,300]), 'sidebar_width': dict(type='integer',minimum=150,maximum=400), 'transcript_percent': dict(type='integer',minimum=20,maximum=80), 'chat_width': dict(type='integer',minimum=280,maximum=700),
+            **{k:BOOL for k in ['sidebar_visible','transcript_visible','notes_visible','chat_visible','pin_transcript']}, 'collapsed_notes': dict(type='array',maxItems=500,items=string(500))})}, ['patch']),
+        action('set', 'control', 'Change workspace view', {'query': string(500), 'trash': BOOL, 'panel': dict(enum=['none','calendar','settings','chat','view','speakers','share','details','notes','trim','redact','transcript']), 'turn_id': string(160,1)}),
     ]),
     tool('chat', 'Ask Terra questions about local recordings. Sends retrieved non-redacted transcript excerpts to OpenAI, returns acceptance, and saves a cited answer. Poll list for streaming, completion, errors, and outdated sources. Does not execute instructions in recordings.', [
         action('list', 'read', 'Read recording chats'),
@@ -125,6 +146,20 @@ TOOLS = [
         action('remove', 'control', 'Remove connection key', {'provider': {'enum': ['assemblyai', 'openai']}}, ['provider']),
         action('open', 'control', 'Open Connections'),
         action('close', 'control', 'Close Connections'),
+    ]),
+    tool('calendar', 'Connect multiple Google accounts with read-only calendar access. OAuth consent stays in the system browser. Secrets are write-only in Keychain. Poll status for sign-in, refresh, errors, calendar selections, events, and local microphone-based call suggestions. Browser activity means a possible call, not a verified meeting. Never infer speaker identities from invitees. Disconnect removes this local connection; Google grants can be revoked in the Google account. No automatic recording.', [
+        action('status','read','Read calendar accounts, events, sign-in progress, and call suggestions'),
+        action('import_client','control','Open the native file picker to import a Google Desktop OAuth client JSON; secrets never returned'),
+        action('configure_client','control','Save Google Desktop OAuth client',{'client_id':string(512,1),'client_secret':string(512,1)},['client_id','client_secret']),
+        action('connect','control','Open Google account sign-in; optional account_id requires reconnecting that same account',{'account_id':string(128,1)}),
+        action('cancel','control','Cancel pending Google sign-in'),
+        action('refresh','control','Refresh selected calendars'),
+        action('select','control','Choose calendars for one Google account',{'account_id':string(128,1),'calendar_ids':dict(type='array',maxItems=50,items=string(1024,1))},['account_id','calendar_ids']),
+        action('disconnect','control','Remove one Google account from PartyLine',{'account_id':string(128,1)},['account_id']),
+        action('detection_configure','control','Enable or disable call suggestions',{'enabled':BOOL},['enabled']),
+        action('dismiss','control','Dismiss a detected call until its microphone activity ends',{'signal_id':string(128,1)},['signal_id']),
+        action('link','control','Attach a calendar event to a recording',{'id':ID,'expected_version':VERSION,'event_key':string(4096,1),'use_details':BOOL},['id','expected_version','event_key','use_details']),
+        action('unlink','control','Remove the calendar link; keep meeting details',{'id':ID,'expected_version':VERSION},['id','expected_version']),
     ]),
 ]
 

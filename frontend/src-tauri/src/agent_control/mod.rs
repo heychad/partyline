@@ -64,9 +64,11 @@ fn ui_result(
     state: State<'_, Control>,
     id: String,
     ok: bool,
+    result: Option<Value>,
+    error: Option<String>,
 ) -> Result<(), String> {
     local_window(&window)?;
-    state.native.ui_result(&id, ok);
+    state.native.ui_result(&id, ok, result, error);
     Ok(())
 }
 

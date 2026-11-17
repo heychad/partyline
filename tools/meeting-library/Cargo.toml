@@ -16,3 +16,5 @@ uuid = { version = "1", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 tempfile = "3"
 hound = "3.5"
+
+url = "2.5"

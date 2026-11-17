@@ -1,5 +1,10 @@
 //! Cloud recording: independent microphone and Mac audio, with local recovery files.
+pub mod calendar;
 mod assembly;
+mod archive;
+pub mod recovery;
+pub mod preferences;
+pub mod setup;
 mod capture;
 pub mod keys;
 pub mod library;
@@ -35,10 +40,11 @@ pub struct Shared {
     stop: CancellationToken,
     audio_done: CancellationToken,
     done: CancellationToken,
-    paused: AtomicBool,
+    paused: Arc<AtomicBool>,
     notes_wake: Notify,
     notes_lock: Mutex<()>,
     force_notes: AtomicBool,
+    recovery_cancel: Mutex<Option<CancellationToken>>,
 }
 impl Shared {
     fn new(app: AppHandle, folder: PathBuf, meeting: Meeting) -> Arc<Self> {
@@ -51,10 +57,11 @@ impl Shared {
             stop: CancellationToken::new(),
             audio_done: CancellationToken::new(),
             done: CancellationToken::new(),
-            paused: AtomicBool::new(false),
+            paused: Arc::new(AtomicBool::new(false)),
             notes_wake: Notify::new(),
             notes_lock: Mutex::new(()),
             force_notes: AtomicBool::new(false),
+            recovery_cancel: Mutex::new(None),
         })
     }
     async fn publish(&self, persist: bool) {
@@ -133,9 +140,20 @@ async fn get(app: &AppHandle, id: &str) -> Result<Arc<Shared>, String> {
         meeting.status = "interrupted".into();
         meeting.notes_status = "idle".into();
         meeting.notes_draft.clear();
+        meeting.capture.recording = false;
+        meeting.recovery_needed = true;
+        let mut durations = Vec::new();
+        for name in ["microphone.wav", "mac-audio.wav"] {
+            if let Ok(duration) = archive::recover_wav(&folder.join(name)) { durations.push(duration); }
+        }
+        if !durations.is_empty() { meeting.duration = durations.into_iter().fold(meeting.duration, f64::max); }
         meeting.errors.push(
             "The app closed before this meeting finished. Captured audio is in its folder.".into(),
         );
+    }
+    if meeting.recovery.status == "running" {
+        meeting.recovery.status = "interrupted".into();
+        meeting.recovery.error = Some("Recovery was interrupted. Retry to resume the saved provider job.".into());
     }
     let s = Shared::new(app.clone(), folder, meeting);
     s.done.cancel();
@@ -209,8 +227,6 @@ pub async fn cloud_start(
     participants: Vec<String>,
     microphone: Option<String>,
 ) -> Result<Meeting, String> {
-    let a = keys::read("assemblyai")?;
-    let o = keys::read("openai")?;
     if crate::audio::recording_commands::is_recording().await {
         return Err("Stop the existing recording first.".into());
     }
@@ -239,8 +255,8 @@ pub async fn cloud_start(
     let s = Shared::new(app.clone(), folder, m.clone());
     {
         let mut current = ACTIVE.lock().unwrap();
-        if current.is_some() {
-            return Err("A meeting is already recording or finishing.".into());
+        if current.is_some() || setup::RUNNING.load(Ordering::SeqCst) {
+            return Err("A meeting or audio setup check is already running.".into());
         }
         *current = Some(s.clone());
     }
@@ -251,29 +267,35 @@ pub async fn cloud_start(
     loaded().lock().await.insert(m.id.clone(), s.clone());
     s.publish(true).await;
     tauri::async_runtime::spawn(async move {
-        run(s, a, o, microphone).await;
+        run(s, microphone).await;
     });
     Ok(m)
 }
-async fn run(s: Arc<Shared>, a: String, o: String, microphone: Option<String>) {
-    let participants = s.meeting.lock().await.participants.clone();
+async fn run(s: Arc<Shared>, microphone: Option<String>) {
     let result=async {
-        let mic=tokio::select!{_ = s.stop.cancelled()=>return Ok(()),r=assembly::open(&a,false,&participants)=>r?};
-        let remote=tokio::select!{_ = s.stop.cancelled()=>{assembly::terminate(mic).await;return Ok(());},r=assembly::open(&a,true,&participants)=>match r{Ok(ws)=>ws,Err(e)=>{assembly::terminate(mic).await;return Err(e);}}};
         let (mt,mr)=mpsc::channel(120);let (rt,rr)=mpsc::channel(120);
-        let mjob=tokio::spawn(assembly::run(s.clone(),"me",a.clone(),mic,mr));
-        let rjob=tokio::spawn(assembly::run(s.clone(),"remote",a,remote,rr));
-        let njob=tokio::spawn(notes::run(s.clone(),o));
+        let stream=s.clone();
+        let jobs=tokio::spawn(async move {
+            let key=tokio::select!{_ = stream.stop.cancelled()=>return,r=tokio::task::spawn_blocking(||keys::read("assemblyai"))=>r.unwrap_or_else(|_|Err("Could not unlock AssemblyAI.".into()))};
+            match key {Ok(a)=>{tokio::join!(assembly::run(stream.clone(),"me",a.clone(),mr),assembly::run(stream.clone(),"remote",a,rr));},Err(e)=>{stream.meeting.lock().await.recovery_needed=true;stream.warning(format!("{e} Local audio continues; recover the transcript afterward.")).await;}}
+        });
+        let ns=s.clone();let njob=tokio::spawn(async move {
+            let key=tokio::select!{_ = ns.audio_done.cancelled()=>return,r=tokio::task::spawn_blocking(||keys::read("openai"))=>r.unwrap_or_else(|_|Err("Could not unlock OpenAI.".into()))};
+            match key {Ok(o)=>notes::run(ns,o).await,Err(e)=>{ns.meeting.lock().await.notes_error=Some(e);ns.publish(true).await;}}
+        });
         let result=capture::run(s.clone(),microphone,[mt,rt]).await;
         if let Err(e)=&result{s.warning(e.clone()).await;}
         // Both streams drain final words and speaker revisions before final notes.
-        let _=tokio::join!(mjob,rjob);
+        let _=jobs.await;
         s.audio_done.cancel();s.notes_wake.notify_one();let _=njob.await;
         result
     }.await;
     if let Err(e) = result {
         s.warning(e).await;
-        s.meeting.lock().await.status = "interrupted".into();
+        {let mut m=s.meeting.lock().await;m.status="interrupted".into();m.capture.recording=false;}
+        use tauri_plugin_notification::NotificationExt;
+        let _=s.app.notification().builder().title("PartyLine recording stopped").body("Audio capture stopped unexpectedly. Saved audio is preserved. Open PartyLine to review the error.").show();
+        if let Some(window)=s.app.get_webview_window("main"){let _=window.request_user_attention(Some(tauri::UserAttentionType::Critical));}
     } else {
         s.meeting.lock().await.status = "complete".into();
     }
@@ -352,7 +374,8 @@ pub async fn cloud_rename_speaker(
         m.revision += 1;
         m.speaker_revision += 1;
     }
-    s.force_notes.store(true, Ordering::SeqCst);
+    if s.audio_done.is_cancelled() && !s.done.is_cancelled() { s.force_notes.store(true, Ordering::SeqCst); }
+    // Name corrections mark notes stale, but respect the user's refresh interval.
     s.publish(true).await;
     if !s.done.is_cancelled() {
         s.notes_wake.notify_one();
@@ -403,4 +426,17 @@ pub async fn cloud_export(app: AppHandle, id: String) -> Result<String, String> 
         .await
         .map_err(|_| "Could not export this meeting.".to_string())?;
     Ok(text)
+}
+
+#[tauri::command]
+pub async fn cloud_merge_speakers(app:AppHandle,id:String,sources:Vec<String>,target:String,expected_version:u64)->Result<Meeting,String>{
+    let s=get(&app,&id).await?;{let mut m=s.meeting.lock().await;m.merge_speakers(&sources,&target,expected_version)?;}
+    if s.audio_done.is_cancelled() && !s.done.is_cancelled() { s.force_notes.store(true, Ordering::SeqCst); }
+    s.notes_wake.notify_one();s.publish(true).await;let result=s.meeting.lock().await.clone();Ok(result)
+}
+#[tauri::command]
+pub async fn cloud_undo_speaker_merge(app:AppHandle,id:String,expected_version:u64)->Result<Meeting,String>{
+    let s=get(&app,&id).await?;{let mut m=s.meeting.lock().await;m.undo_merge(expected_version)?;}
+    if s.audio_done.is_cancelled() && !s.done.is_cancelled() { s.force_notes.store(true, Ordering::SeqCst); }
+    s.notes_wake.notify_one();s.publish(true).await;let result=s.meeting.lock().await.clone();Ok(result)
 }

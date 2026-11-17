@@ -12,6 +12,14 @@ fn main() {
         println!("cargo:rustc-link-lib=framework=AVFoundation");
         println!("cargo:rustc-link-lib=framework=Cocoa");
         println!("cargo:rustc-link-lib=framework=Foundation");
+        println!("cargo:rustc-link-lib=framework=CoreAudio");
+        println!("cargo:rerun-if-changed=native/meeting_detection.m");
+        let out=std::path::PathBuf::from(std::env::var("OUT_DIR").unwrap());
+        let arch=if std::env::var("CARGO_CFG_TARGET_ARCH").unwrap()=="aarch64" {"arm64"} else {"x86_64"};
+        assert!(std::process::Command::new("xcrun").args(["clang","-arch",arch,"-fobjc-arc","-mmacosx-version-min=12.3","-c","native/meeting_detection.m","-o"]).arg(out.join("meeting_detection.o")).status().unwrap().success());
+        assert!(std::process::Command::new("ar").arg("crs").arg(out.join("libpartyline_detection.a")).arg(out.join("meeting_detection.o")).status().unwrap().success());
+        println!("cargo:rustc-link-search=native={}",out.display());
+        println!("cargo:rustc-link-lib=static=partyline_detection");
 
         // Let the enhanced_macos crate handle its own Swift compilation
         // The swift-rs crate build will be handled in the enhanced_macos crate's build.rs
